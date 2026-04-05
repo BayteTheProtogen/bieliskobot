@@ -78,10 +78,25 @@ export async function handleInteractions(interaction: Interaction) {
             const gender = interaction.fields.getTextInputValue('gender').toUpperCase();
             const citizenship = interaction.fields.getTextInputValue('citizenship');
 
+            // Walidacja płci
+            if (!['M', 'K', 'X', 'F'].includes(gender)) {
+                await interaction.reply({ content: 'Nieprawidłowa płeć! Dostępne, wpisywane opcje to wyłącznie: M, K lub X', ephemeral: true });
+                return;
+            }
+
             // Walidacja daty
             const dateParts = dob.split('.');
             if (dateParts.length !== 3 || dateParts[2].length !== 4) {
                 await interaction.reply({ content: 'Nieprawidłowy format daty urodzenia! Użyj DD.MM.RRRR (np. 01.05.2000)', ephemeral: true });
+                return;
+            }
+
+            const day = parseInt(dateParts[0], 10);
+            const month = parseInt(dateParts[1], 10);
+            const year = parseInt(dateParts[2], 10);
+            
+            if (isNaN(day) || Math.abs(day) < 1 || Math.abs(day) > 31 || isNaN(month) || month < 1 || month > 12 || isNaN(year) || year < 1800 || year > 2200) {
+                await interaction.reply({ content: 'Podana data urodzenia jest niepoprawna lub fizycznie niemożliwa.', ephemeral: true });
                 return;
             }
 

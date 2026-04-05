@@ -67,14 +67,12 @@ export const dowodCommand = {
             // Check if exists for 'wyrob'
             const existingCitizen = await prisma.citizen.findUnique({ where: { discordId } });
 
+            let warnMessage = '';
             if (subcommand === 'wyrob' && existingCitizen) {
-                await interaction.reply({
-                    content: '⚠️ Posiadasz już wyrobiony dowód osobisty pod tym kontem! Jeśli zrobisz go znowu, **stary dowód zostanie usunięty i nadpisany**. Jeśli po prostu miałeś to na myśli, używaj komendy `/dowod zaktualizuj`.\n\nŁadowanie...',
-                    ephemeral: true
-                });
-            } else {
-                await interaction.reply({ content: 'Szukam postaci...', ephemeral: true });
+                warnMessage = '⚠️ **UWAGA: Posiadasz już wyrobiony dowód.** Zatwierdzenie nowej postaci spowoduje bezpowrotne **nadpisanie** Twojego starego dowodu!\n\n';
             }
+
+            await interaction.reply({ content: warnMessage + 'Szukam postaci...', ephemeral: true });
 
             const nick = interaction.options.getString('nick', true);
             const robloxUserId = await getUserIdByUsername(nick);
@@ -113,7 +111,7 @@ export const dowodCommand = {
                 );
 
             await interaction.editReply({
-                content: '',
+                content: warnMessage,
                 embeds: [embed],
                 components: [row]
             });
