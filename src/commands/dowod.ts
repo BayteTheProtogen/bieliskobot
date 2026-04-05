@@ -72,10 +72,23 @@ export const dowodCommand = {
                     content: '🚫 Posiadasz już wyrobiony dowód osobisty na tym koncie! Tworzenie drugiego dowodu jest zablokowane. Jeśli chcesz zaktualizować swoje dane lub poprawić postać, skorzystaj z dedykowanej dla tego komendy `/dowod zaktualizuj nick:`',
                     ephemeral: true
                 });
+            } else if (subcommand === 'zaktualizuj' && !existingCitizen) {
+                return interaction.reply({
+                    content: '🚫 Nie posiadasz jeszcze wyrobionego dowodu osobistego! Użyj najpierw komendy `/dowod wyrob nick:`',
+                    ephemeral: true
+                });
+            } else if (subcommand === 'zaktualizuj') {
+                const pending = await prisma.pendingUpdate.findFirst({ where: { discordId } });
+                if (pending) {
+                    return interaction.reply({
+                        content: '🚫 Masz już złożone, aktywne podanie o aktualizację w Urzędzie! Poczekaj na jego weryfikację przez administratora, zanim złożysz kolejne.',
+                        ephemeral: true
+                    });
+                }
+                await interaction.reply({ content: 'Szukam postaci...', ephemeral: true });
             } else {
                 await interaction.reply({ content: 'Szukam postaci...', ephemeral: true });
             }
-
 
             const nick = interaction.options.getString('nick', true);
             const robloxUserId = await getUserIdByUsername(nick);

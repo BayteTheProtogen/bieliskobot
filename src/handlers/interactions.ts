@@ -1,4 +1,4 @@
-import { Interaction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, AttachmentBuilder } from 'discord.js';
+import { Interaction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, AttachmentBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { prisma } from '../services/db';
 import { generateIDCard } from '../services/canvas';
 import { getAvatarBust, getUserInfo } from '../services/roblox';
@@ -17,9 +17,11 @@ export async function handleInteractions(interaction: Interaction) {
             const robloxUserId = parts[1];
             const nick = parts[2];
 
+            const action = parts[3];
+
             // Pokaż modal formularz
             const modal = new ModalBuilder()
-                .setCustomId(`modal_id_${robloxUserId}|${nick}`)
+                .setCustomId(`modal_id_${robloxUserId}|${nick}|${action}`)
                 .setTitle('Dane do Dowodu Osobistego');
 
             const firstNameInput = new TextInputBuilder()
@@ -66,11 +68,138 @@ export async function handleInteractions(interaction: Interaction) {
 
             await interaction.showModal(modal);
         }
+
+        if (customId.startsWith('admin_')) {
+            const isApprove = customId.startsWith('admin_approve_');
+            const isReject = customId.startsWith('admin_reject_');
+            const isReason = customId.startsWith('admin_reason_');
+            
+            const updateIdStr = customId.split('_').pop() || '0';
+            const updateId = parseInt(updateIdStr, 10);
+            
+            const pending = await prisma.pendingUpdate.findUnique({ where: { id: updateId } });
+            if (!pending) {
+                await interaction.update({ content: 'Podanie wygasło lub zostało zrealizowane.', embeds: [], components: [] });
+                return;
+            }
+
+            if (isApprove) {
+                await interaction.deferUpdate();
+                
+                const dobParts = pending.newDob.split('.');
+                const YY = dobParts[2].substring(2, 4);
+                const MM = dobParts[1];
+                const DD = dobParts[0];
+                let endID = pending.newRobloxId.substring(pending.newRobloxId.length - 4);
+                if (endID.length < 4) endID = endID.padStart(4, '0');
+                const citizenNumber = `${YY}${MM}${DD}${endID}`;
+
+                const citizenData = {
+                    discordId: pending.discordId,
+                    robloxNick: pending.newRobloxNick,
+                    robloxId: pending.newRobloxId,
+                    firstName: pending.newFirstName,
+                    lastName: pending.newLastName,
+                    dob: pending.newDob,
+                    gender: pending.newGender,
+                    citizenship: pending.newCitizenship,
+                    citizenNumber,
+                };
+
+                const savedCitizen = await prisma.citizen.upsert({
+                    where: { discordId: pending.discordId },
+                    update: citizenData,
+                    create: citizenData,
+                });
+
+                await prisma.pendingUpdate.delete({ where: { id: updateId } });
+
+                const oldEmbed = interaction.message.embeds[0];
+                const newEmbed = EmbedBuilder.from(oldEmbed).setColor('#00ff00').setTitle('Urząd: Podanie Zatwierdzone ✅');
+                await interaction.editReply({ embeds: [newEmbed], components: [] });
+
+                try {
+                    const avatarBustUrl = await getAvatarBust(pending.newRobloxId);
+                    const buffer = await generateIDCard(savedCitizen, avatarBustUrl || '');
+                    const attachment = new AttachmentBuilder(buffer, { name: 'dowod.png' });
+
+                    const citizenUser = await interaction.client.users.fetch(pending.discordId);
+                    if (citizenUser) {
+                        try {
+                            await citizenUser.send({ content: '✅ Urząd zatwierdził Twoje podanie o aktualizację dowodu! Oto nowy dokument:', files: [attachment] });
+                        } catch(e) {}
+                    }
+
+                    try {
+                        const guild = interaction.guild;
+                        if (guild) {
+                            const member = await guild.members.fetch(pending.discordId);
+                            const roleId = '1490075447629971467';
+                            if (!member.roles.cache.has(roleId)) await member.roles.add(roleId);
+                            const robloxUser = await getUserInfo(pending.newRobloxId);
+                            if (robloxUser) await member.setNickname(`${robloxUser.displayName} (@${robloxUser.name})`);
+                        }
+                    } catch(e) {}
+                } catch(e) {
+                    console.error('Error post-approve', e);
+                }
+
+            } else if (isReject) {
+                await prisma.pendingUpdate.delete({ where: { id: updateId } });
+                
+                const oldEmbed = interaction.message.embeds[0];
+                const newEmbed = EmbedBuilder.from(oldEmbed).setColor('#ff0000').setTitle('Urząd: Podanie Odrzucone ❌');
+                await interaction.update({ embeds: [newEmbed], components: [] });
+
+                try {
+                    const citizenUser = await interaction.client.users.fetch(pending.discordId);
+                    if (citizenUser) await citizenUser.send({ content: '❌ Urząd odrzucił Twoje podanie o zaktualizowanie dowodu osobistego.' });
+                } catch(e) {}
+            } else if (isReason) {
+                const modal = new ModalBuilder()
+                    .setCustomId(`admin_reason_modal_${updateId}`)
+                    .setTitle('Powód odrzucenia');
+                const reasonInput = new TextInputBuilder()
+                    .setCustomId('reason')
+                    .setLabel("Dlaczego odrzucasz ten wniosek?")
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setRequired(true);
+                const row = new ActionRowBuilder<TextInputBuilder>().addComponents(reasonInput);
+                modal.addComponents(row);
+                await interaction.showModal(modal);
+            }
+        }
     } else if (interaction.isModalSubmit()) {
+        if (interaction.customId.startsWith('admin_reason_modal_')) {
+            const updateId = parseInt(interaction.customId.replace('admin_reason_modal_', ''), 10);
+            const reason = interaction.fields.getTextInputValue('reason');
+            
+            const pending = await prisma.pendingUpdate.findUnique({ where: { id: updateId } });
+            if (!pending) return interaction.reply({ content: 'Błąd: Podanie wygasło.', ephemeral: true });
+
+            await prisma.pendingUpdate.delete({ where: { id: updateId } });
+
+            if (interaction.message) {
+                const oldEmbed = interaction.message.embeds[0];
+                const newEmbed = EmbedBuilder.from(oldEmbed).setColor('#ff0000').setTitle('Urząd: Podanie Odrzucone ❌').addFields({name: 'Powód odrzucenia', value: reason});
+                await interaction.deferUpdate();
+                await interaction.message.edit({ embeds: [newEmbed], components: [] });
+            } else {
+                await interaction.reply({ content: 'Odrzucono pomyślnie!', ephemeral: true });
+            }
+
+            try {
+                const citizenUser = await interaction.client.users.fetch(pending.discordId);
+                if (citizenUser) await citizenUser.send({ content: `❌ Urząd odrzucił Twoje podanie o aktualizację dowodu osobistego.\n**Powód:** ${reason}` });
+            } catch(e) {}
+            return;
+        }
+
         if (interaction.customId.startsWith('modal_id_')) {
             const parts = interaction.customId.replace('modal_id_', '').split('|');
             const robloxId = parts[0];
             const robloxNick = parts[1];
+            const action = parts[2] || 'create';
 
             const firstName = interaction.fields.getTextInputValue('firstName');
             const lastName = interaction.fields.getTextInputValue('lastName');
@@ -114,8 +243,65 @@ export async function handleInteractions(interaction: Interaction) {
 
             const citizenNumber = `${YY}${MM}${DD}${endID}`;
 
-            await interaction.reply({ content: 'Generowanie i zapisywanie dowodu... ⏳', ephemeral: true });
+            await interaction.reply({ content: 'Generowanie i zapisywanie dokumentu... ⏳', ephemeral: true });
 
+            if (action === 'update') {
+                try {
+                    const oldCitizen = await prisma.citizen.findUnique({ where: { discordId: interaction.user.id } });
+                    if (!oldCitizen) {
+                         return interaction.editReply({ content: 'Błąd: Nie znaleziono starego dowodu do aktualizacji.' });
+                    }
+
+                    const pendingUpdate = await prisma.pendingUpdate.create({
+                        data: {
+                            discordId: interaction.user.id,
+                            newRobloxNick: robloxNick,
+                            newRobloxId: robloxId,
+                            newFirstName: firstName,
+                            newLastName: lastName,
+                            newDob: dob,
+                            newGender: gender,
+                            newCitizenship: citizenship
+                        }
+                    });
+
+                    const adminChannel = await interaction.client.channels.fetch('1490393894448271370');
+                    if (adminChannel && adminChannel.isTextBased() && 'send' in adminChannel) {
+                        const embed = new EmbedBuilder()
+                            .setTitle(`Urząd: Podanie o aktualizację dowodu`)
+                            .setDescription(`Użytkownik <@${interaction.user.id}> składa wniosek o zaktualizowanie danych w dowodzie.`)
+                            .setColor('#e6a822')
+                            .addFields(
+                                { name: 'Imię', value: `${oldCitizen.firstName} ➔ **${firstName}**`, inline: true },
+                                { name: 'Nazwisko', value: `${oldCitizen.lastName} ➔ **${lastName}**`, inline: true },
+                                { name: 'Data Urodzenia', value: `${oldCitizen.dob} ➔ **${dob}**`, inline: true },
+                                { name: 'Roblox Nick', value: `${oldCitizen.robloxNick} ➔ **${robloxNick}**`, inline: true },
+                                { name: 'Płeć', value: `${oldCitizen.gender} ➔ **${gender}**`, inline: true },
+                                { name: 'Obywatelstwo', value: `${oldCitizen.citizenship} ➔ **${citizenship}**`, inline: true }
+                            )
+                            .setFooter({ text: `ID Wniosku: ${pendingUpdate.id}` });
+
+                        const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                            new ButtonBuilder().setCustomId(`admin_approve_${pendingUpdate.id}`).setLabel('✅ Zatwierdź').setStyle(ButtonStyle.Success),
+                            new ButtonBuilder().setCustomId(`admin_reject_${pendingUpdate.id}`).setLabel('❌ Odrzuć').setStyle(ButtonStyle.Danger),
+                            new ButtonBuilder().setCustomId(`admin_reason_${pendingUpdate.id}`).setLabel('📝 Odrzuć ze zwrotem').setStyle(ButtonStyle.Secondary)
+                        );
+
+                        await adminChannel.send({ embeds: [embed], components: [row] });
+                        await interaction.editReply({ content: '✅ Twoje podanie o zaktualizowanie dowodu osobistego zostało złożone! Urząd wkrótce je rozpatrzy, a o decyzji dowiesz się poprzez Wiadomość Prywatną.' });
+                        return;
+                    } else {
+                        await interaction.editReply({ content: 'Błąd: Kanał urzędu administracyjnego jest nieosiągalny.' });
+                        return;
+                    }
+                } catch(e) {
+                    console.error('Wystąpił błąd przy dodawaniu podania', e);
+                    await interaction.editReply({ content: 'Błąd bazy danych podczas składania podania.' });
+                    return;
+                }
+            }
+
+            // Logika dla 'create'
             try {
                 // Zapisz do bazy
                 const citizenData = {
