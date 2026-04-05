@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, REST, Routes } from 'discord.js';
+import { Client, GatewayIntentBits, REST, Routes, Events } from 'discord.js';
 import * as dotenv from 'dotenv';
 import { dowodCommand } from './commands/dowod';
 import { handleInteractions } from './handlers/interactions';
@@ -22,7 +22,7 @@ if (!token || !clientId) {
 
 const rest = new REST({ version: '10' }).setToken(token);
 
-client.once('ready', async () => {
+client.once(Events.ClientReady, async () => {
     console.log(`Bot logged in as ${client.user?.tag}`);
 
     try {
