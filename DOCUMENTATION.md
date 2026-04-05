@@ -67,7 +67,18 @@ Dostępne wyłącznie na kanale administracyjnym (`1490274396391211158`).
 *   `!bb kick [nick] [powód]` – Wyrzuca gracza z serwera Roblox.
 *   `!bb tempban [nick] [czas_h] [powód]` – Banuje gracza na X godzin. Generuje grafikę "Zza Krat" na kanale `banroom`.
 *   `!bb permban [nick] [powód]` – Dożywotni ban (tylko Owner).
-*   `!bb unban [nick]` – Zdjęcie kary.
+*   `!bb unban [nick]` – Zdjęcie kary. **Nowość:** Automatycznie edytuje wszystkie historyczne logi baczności gracza, dodając dopisek `🔓 ODBANOWANO`.
+
+### 🌐 Synchronizacja In-Game (ER:LC Sync):
+BieliskoBot automatycznie monitoruje działania administracyjne wykonane bezpośrednio na serwerze Roblox (co 10 minut).
+*   **Wykrywanie Kary**: Jeśli admin użyje komendy `:kick` lub `:ban` w grze, bot wykryje to przez API ER:LC.
+*   **Interakcja z Adminem**: Bot wysyła **prywatną wiadomość (DM)** do admina na Discordzie z prośbą o podanie powodu i czasu kary.
+*   **Logowanie**: Po uzyskaniu odpowiedzi, bot generuje pełny log na kanale `banroom` (wraz z grafiką osadzonego) i zapisuje karę w bazie.
+*   **Pouczenie**: Admin otrzymuje przypomnienie o zalecanym używaniu komendy `!bb` na Discordzie dla pełnej wygody.
+
+*Uwaga: Aby funkcja działała, admin musi mieć założony profil w bota (powiązany `robloxId`).*
+
+---
 
 ---
 
@@ -79,6 +90,13 @@ Model `Citizen` przechowuje:
 *   `pocket`, `bank` (Ekonomia)
 *   `bannedUntil`, `isPermBanned` (Status prawny)
 *   Dane personalne (Imię, Nazwisko, Data urodzenia, Płeć)
+
+### Tabela `Punishment`:
+Przechowuje pełną historię kar dla każdego obywatela:
+*   `type` (KICK / BAN / PERMBAN)
+*   `reason`, `duration`
+*   `messageId` (ID powiązanej wiadomości na kanale logów – pozwala na późniejszą edycję statusu)
+*   `isActive` (Flaga określająca, czy kara jest wciąż w toku)
 
 ---
 *Dokumentacja wygenerowana automatycznie przez BieliskoBot System.*
