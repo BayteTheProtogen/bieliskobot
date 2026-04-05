@@ -1,9 +1,34 @@
-import { Interaction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, AttachmentBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { Interaction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, AttachmentBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, UserSelectMenuInteraction } from 'discord.js';
 import { prisma } from '../services/db';
-import { generateIDCard } from '../services/canvas';
+import { generateIDCard, generateFineCard } from '../services/canvas';
 import { getAvatarBust, getUserInfo } from '../services/roblox';
 
 export async function handleInteractions(interaction: Interaction) {
+    if (interaction.isUserSelectMenu()) {
+        if (interaction.customId === 'admin_select_uniewaznij') {
+            const targetDiscordId = interaction.values[0];
+            const citizen = await prisma.citizen.findUnique({ where: { discordId: targetDiscordId } });
+
+            if (!citizen) {
+                return interaction.reply({ content: '🚫 Ten użytkownik nie posiada wyrobionego dowodu osobistego w bazie.', ephemeral: true });
+            }
+
+            const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`owner_confirm_unieważnij|${targetDiscordId}`)
+                    .setLabel(`🔴 Potwierdzam: Unieważnij dowód ${citizen.firstName} ${citizen.lastName}`)
+                    .setStyle(ButtonStyle.Danger)
+            );
+
+            await interaction.reply({
+                content: `### 🛠️ Administracyjne unieważnienie\nWybrano obywatela: **${citizen.firstName} ${citizen.lastName}** (@${citizen.robloxNick})\nCzy na pewno chcesz natychmiastowo unieważnić jego dokumenty?`,
+                components: [row],
+                ephemeral: true
+            });
+            return;
+        }
+    }
+
     if (interaction.isButton()) {
         const { customId } = interaction;
 
@@ -287,6 +312,37 @@ export async function handleInteractions(interaction: Interaction) {
                 await interaction.editReply({ content: '🚫 Nie znaleziono dowodu tego gracza (możliwe, że został już usunięty).', components: [] });
             }
         }
+
+        if (customId.startsWith('confirm_transfer|')) {
+            const parts = customId.split('|');
+            const targetDiscordId = parts[1];
+            const amount = parseInt(parts[2], 10);
+            
+            await interaction.deferUpdate();
+            
+            const sender = await prisma.citizen.findUnique({ where: { discordId: interaction.user.id } });
+            const recipient = await prisma.citizen.findUnique({ where: { discordId: targetDiscordId } });
+
+            if (!sender || !recipient) {
+                 return interaction.editReply({ content: '🚫 Wystąpił błąd: Jeden z uczestników transakcji nie ma już konta.', components: [] });
+            }
+
+            if (sender.pocket < amount) {
+                return interaction.editReply({ content: `🚫 Nie masz już wystarczającej kwoty w kieszeni!`, components: [] });
+            }
+
+            await prisma.$transaction([
+                prisma.citizen.update({ where: { discordId: interaction.user.id }, data: { pocket: { decrement: amount } } }),
+                prisma.citizen.update({ where: { discordId: targetDiscordId }, data: { pocket: { increment: amount } } })
+            ]);
+
+            await interaction.editReply({ content: `✅ Przelano pomyślnie **${amount} zł** do obywatela **${recipient.firstName} ${recipient.lastName}**.`, components: [] });
+
+            try {
+                const recipientUser = await interaction.client.users.fetch(targetDiscordId);
+                if (recipientUser) await recipientUser.send(`💸 Otrzymałeś przelew w wysokości **${amount} zł** od obywatela **${sender.firstName} ${sender.lastName}**.`);
+            } catch(e) {}
+        }
     } else if (interaction.isModalSubmit()) {
         if (interaction.customId.startsWith('admin_reason_modal_')) {
             const updateId = parseInt(interaction.customId.replace('admin_reason_modal_', ''), 10);
@@ -333,6 +389,96 @@ export async function handleInteractions(interaction: Interaction) {
                 components: [row],
                 ephemeral: true
             });
+            return;
+        }
+
+        if (interaction.customId === 'mandat_modal') {
+            const targetNick = interaction.fields.getTextInputValue('targetNick');
+            const reason = interaction.fields.getTextInputValue('reason');
+            const amount = parseInt(interaction.fields.getTextInputValue('amount'), 10);
+
+            if (isNaN(amount) || amount < 0) {
+                return interaction.reply({ content: '🚫 Nieprawidłowa kwota mandatu.', ephemeral: true });
+            }
+
+            const target = await prisma.citizen.findFirst({ where: { robloxNick: targetNick } });
+            if (!target) {
+                return interaction.reply({ content: `🚫 Nie znaleziono w bazie obywatela o nicku: **${targetNick}**.`, ephemeral: true });
+            }
+
+            await interaction.reply({ content: 'Przetwarzanie mandatu... ⚖️', ephemeral: true });
+
+            // Cascading payment logic
+            let remainingFine = amount;
+            let pocketDeduct = 0;
+            let bankDeduct = 0;
+
+            if (amount > 0) {
+                // Pocket first
+                if (target.pocket >= remainingFine) {
+                    pocketDeduct = remainingFine;
+                    remainingFine = 0;
+                } else {
+                    pocketDeduct = target.pocket;
+                    remainingFine -= target.pocket;
+                }
+
+                // Bank second
+                if (remainingFine > 0) {
+                    if (target.bank >= remainingFine) {
+                        bankDeduct = remainingFine;
+                        remainingFine = 0;
+                    } else {
+                        bankDeduct = target.bank;
+                        remainingFine -= target.bank;
+                    }
+                }
+
+                // Debt goes to pocket
+                if (remainingFine > 0) {
+                    pocketDeduct += remainingFine;
+                }
+
+                await prisma.citizen.update({
+                    where: { discordId: target.discordId },
+                    data: {
+                        pocket: { decrement: pocketDeduct },
+                        bank: { decrement: bankDeduct }
+                    }
+                });
+            }
+
+            // Generate Image
+            const officerMember = await interaction.guild?.members.fetch(interaction.user.id);
+            const officerName = officerMember?.nickname || interaction.user.username;
+
+            const buffer = await generateFineCard({
+                targetName: `${target.firstName} ${target.lastName}`,
+                targetNick: target.robloxNick,
+                reason,
+                amount,
+                citizenNumber: target.citizenNumber,
+                officerName,
+                date: new Date().toLocaleString('pl-PL')
+            });
+
+            const attachment = new AttachmentBuilder(buffer, { name: 'mandat.png' });
+
+            // Send to channel
+            if (interaction.channel && 'send' in interaction.channel) {
+                await interaction.channel.send({
+                    content: `⚖️ Wystawiono ${amount === 0 ? 'pouczenie' : 'mandat'} dla <@${target.discordId}>!`,
+                    files: [attachment]
+                });
+            }
+
+            // Send to DM
+            try {
+                const targetUser = await interaction.client.users.fetch(target.discordId);
+                if (targetUser) await targetUser.send({ content: `🔴 Otrzymałeś ${amount === 0 ? 'pouczenie' : 'mandat'} w świecie RP Bielisko.`, files: [attachment] });
+            } catch(e) {}
+
+            await interaction.editReply({ content: '✅ Mandat został wystawiony i przesłany.' });
             return;
         }
 

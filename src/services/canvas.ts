@@ -211,3 +211,128 @@ export async function generateIDCard(data: CitizenData, avatarUrl: string): Prom
 
     return canvas.toBuffer('image/png');
 }
+
+export interface FineData {
+    targetName: string;
+    targetNick: string;
+    reason: string;
+    amount: number;
+    citizenNumber: string;
+    officerName: string;
+    date: string;
+}
+
+export async function generateFineCard(data: FineData): Promise<Buffer> {
+    const width = 600;
+    const height = 800;
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+
+    const isWarning = data.amount === 0;
+    const primaryColor = isWarning ? '#f1c40f' : '#e74c3c'; // Yellow or Red
+    const secondaryColor = isWarning ? '#f39c12' : '#c0392b';
+
+    // Background
+    ctx.fillStyle = '#f8f9fa';
+    ctx.fillRect(0, 0, width, height);
+
+    // Decorative Borders
+    ctx.strokeStyle = primaryColor;
+    ctx.lineWidth = 20;
+    ctx.strokeRect(0, 0, width, height);
+
+    // Header
+    const headerHeight = 120;
+    const grad = ctx.createLinearGradient(0, 0, width, headerHeight);
+    grad.addColorStop(0, primaryColor);
+    grad.addColorStop(1, secondaryColor);
+    ctx.fillStyle = grad;
+    ctx.fillRect(10, 10, width - 20, headerHeight);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 42px Roboto';
+    ctx.textAlign = 'center';
+    ctx.fillText(isWarning ? 'POUCZENIE' : 'MANDAT KARNY', width / 2, 70);
+    
+    ctx.font = '20px Roboto';
+    ctx.fillText('RP BIELISKO - SŁUŻBY PORZĄDKOWE', width / 2, 105);
+
+    // Content Area
+    const contentX = 50;
+    let currentY = 200;
+
+    const drawLabelValue = (label: string, value: string) => {
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#7f8c8d';
+        ctx.font = 'bold 16px Roboto';
+        ctx.fillText(label.toUpperCase(), contentX, currentY);
+        
+        ctx.fillStyle = '#2c3e50';
+        ctx.font = '24px RobotoBold';
+        ctx.fillText(value, contentX, currentY + 35);
+        currentY += 80;
+    };
+
+    drawLabelValue('Obywatel (Ukarany)', `${data.targetName} (@${data.targetNick})`);
+    drawLabelValue('Numer Dowodu', data.citizenNumber);
+    
+    // Reason with wrapping
+    ctx.fillStyle = '#7f8c8d';
+    ctx.font = 'bold 16px Roboto';
+    ctx.fillText('POWÓD WYSTAWIENIA', contentX, currentY);
+    ctx.fillStyle = '#2c3e50';
+    ctx.font = '20px Roboto';
+    
+    const words = data.reason.split(' ');
+    let line = '';
+    const maxWidth = width - 100;
+    let reasonY = currentY + 30;
+    
+    for (const word of words) {
+        const testLine = line + word + ' ';
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > maxWidth && line !== '') {
+            ctx.fillText(line, contentX, reasonY);
+            line = word + ' ';
+            reasonY += 25;
+        } else {
+            line = testLine;
+        }
+    }
+    ctx.fillText(line, contentX, reasonY);
+    currentY = reasonY + 60;
+
+    // Line separator
+    ctx.strokeStyle = '#dcdde1';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(contentX, currentY - 30);
+    ctx.lineTo(width - contentX, currentY - 30);
+    ctx.stroke();
+
+    drawLabelValue('Kwota Grzywny', isWarning ? '0 ZŁ (POUCZENIE)' : `${data.amount.toLocaleString()} ZŁ`);
+    drawLabelValue('Funkcjonariusz', data.officerName);
+    drawLabelValue('Data i Godzina', data.date);
+
+    // Footer / Stamp
+    ctx.save();
+    ctx.translate(width - 150, height - 150);
+    ctx.rotate(-Math.PI / 12);
+    ctx.strokeStyle = primaryColor;
+    ctx.lineWidth = 4;
+    ctx.strokeRect(-100, -40, 200, 80);
+    ctx.fillStyle = primaryColor;
+    ctx.font = 'bold 20px Roboto';
+    ctx.textAlign = 'center';
+    ctx.fillText('ZATWIERDZONO', 0, -5);
+    ctx.fillText('SYSTEM RP', 0, 20);
+    ctx.restore();
+
+    // Security Pattern (Bottom)
+    ctx.fillStyle = '#bdc3c7';
+    ctx.font = '10px SpaceMono';
+    ctx.textAlign = 'center';
+    ctx.fillText(`ID_FINE_${Date.now()}_${data.citizenNumber}`, width / 2, height - 30);
+
+    return canvas.toBuffer('image/png');
+}

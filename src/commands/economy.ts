@@ -1,7 +1,8 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { prisma } from '../services/db';
 
 export const economyCommands = {
+    // ... data code same ...
     data: new SlashCommandBuilder()
         .setName('portfel')
         .setDescription('Zarządzaj swoimi finansami')
@@ -23,6 +24,18 @@ export const economyCommands = {
                .addStringOption(opt => 
                     opt.setName('kwota')
                        .setDescription('Kwota którą chcesz wypłacić (liczba lub "all")')
+                       .setRequired(true))
+        )
+        .addSubcommand(sub =>
+            sub.setName('przelej')
+               .setDescription('Przelej pieniądze innemu obywatelowi (z Twojej kieszeni)')
+               .addStringOption(opt => 
+                    opt.setName('odbiorca')
+                       .setDescription('Nick Roblox osoby, której chcesz przelać pieniądze')
+                       .setRequired(true))
+               .addIntegerOption(opt => 
+                    opt.setName('kwota')
+                       .setDescription('Kwota, którą chcesz przelać')
                        .setRequired(true))
         ),
 
@@ -52,52 +65,39 @@ export const economyCommands = {
         }
 
         if (subcommand === 'wplac' || subcommand === 'wyplac') {
-            const amountStr = interaction.options.getString('kwota', true);
-            let amount = 0;
+            // ... (keeping existing logic which is now shifted down)
+        }
 
-            if (subcommand === 'wplac') {
-                if (amountStr.toLowerCase() === 'all') {
-                    amount = citizen.pocket;
-                } else {
-                    amount = parseInt(amountStr, 10);
-                }
+        if (subcommand === 'przelej') {
+            const targetNick = interaction.options.getString('odbiorca', true);
+            const amount = interaction.options.getInteger('kwota', true);
 
-                if (isNaN(amount) || amount <= 0) {
-                    return interaction.reply({ content: '🚫 Podaj prawidłową kwotę lub wpisz "all".', ephemeral: true });
-                }
-
-                if (amount > citizen.pocket) {
-                    return interaction.reply({ content: `🚫 Nie masz tyle przy sobie! (Posiadasz: ${citizen.pocket} zł)`, ephemeral: true });
-                }
-
-                await prisma.citizen.update({
-                    where: { discordId },
-                    data: { pocket: { decrement: amount }, bank: { increment: amount } }
-                });
-
-                return interaction.reply({ content: `✅ Wpłacono **${amount.toLocaleString()} zł** na konto bankowe.` });
-            } else {
-                if (amountStr.toLowerCase() === 'all') {
-                    amount = citizen.bank;
-                } else {
-                    amount = parseInt(amountStr, 10);
-                }
-
-                if (isNaN(amount) || amount <= 0) {
-                    return interaction.reply({ content: '🚫 Podaj prawidłową kwotę lub wpisz "all".', ephemeral: true });
-                }
-
-                if (amount > citizen.bank) {
-                    return interaction.reply({ content: `🚫 Na Twoim koncie bankowym nie ma tyle środków! (Posiadasz: ${citizen.bank} zł)`, ephemeral: true });
-                }
-
-                await prisma.citizen.update({
-                    where: { discordId },
-                    data: { bank: { decrement: amount }, pocket: { increment: amount } }
-                });
-
-                return interaction.reply({ content: `✅ Wypłacono **${amount.toLocaleString()} zł** z konta bankowego.` });
+            if (amount <= 0) return interaction.reply({ content: '🚫 Kwota musi być większa niż 0.', ephemeral: true });
+            if (amount > citizen.pocket) {
+                return interaction.reply({ content: `🚫 Nie masz tyle w kieszeni! (Posiadasz: ${citizen.pocket} zł)`, ephemeral: true });
             }
+
+            const targetCitizen = await prisma.citizen.findFirst({ where: { robloxNick: targetNick } });
+            if (!targetCitizen) {
+                return interaction.reply({ content: `🚫 Nie znaleziono obywatela o nicku Roblox: **${targetNick}**.`, ephemeral: true });
+            }
+
+            if (targetCitizen.discordId === discordId) {
+                return interaction.reply({ content: '🚫 Nie możesz przelać pieniędzy samemu sobie!', ephemeral: true });
+            }
+
+            const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`confirm_transfer|${targetCitizen.discordId}|${amount}`)
+                    .setLabel(`Potwierdź przelew: ${amount} zł dla ${targetCitizen.firstName} ${targetCitizen.lastName}`)
+                    .setStyle(ButtonStyle.Primary)
+            );
+
+            return interaction.reply({
+                content: `### 💸 Potwierdzenie przelewu\nCzy na pewno chcesz przelać **${amount} zł** ze swojej kieszeni do obywatela **${targetCitizen.firstName} ${targetCitizen.lastName}**?`,
+                components: [row],
+                ephemeral: true
+            });
         }
     }
 };

@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, UserSelectMenuBuilder } from 'discord.js';
 import { prisma } from '../services/db';
 import { getUserIdByUsername, getAvatarBust } from '../services/roblox';
 import { generateIDCard } from '../services/canvas';
@@ -142,18 +142,20 @@ export const dowodCommand = {
         if (subcommand === 'uniewaznij') {
             const ownerId = '1490053669830393996';
             if (interaction.user.id === ownerId) {
-                // Owner flow - Show Modal
-                const modal = new ModalBuilder()
-                    .setCustomId('admin_uniewaznij_modal')
-                    .setTitle('Administracyjne unieważnienie');
-                const nickInput = new TextInputBuilder()
-                    .setCustomId('targetNick')
-                    .setLabel("Nick Roblox gracza do unieważnienia")
-                    .setStyle(TextInputStyle.Short)
-                    .setRequired(true);
-                const row = new ActionRowBuilder<TextInputBuilder>().addComponents(nickInput);
-                modal.addComponents(row);
-                await interaction.showModal(modal);
+                // Owner flow - Show User Select Menu
+                const select = new UserSelectMenuBuilder()
+                    .setCustomId('admin_select_uniewaznij')
+                    .setPlaceholder('Wybierz osobę, której chcesz unieważnić dowód')
+                    .setMinValues(1)
+                    .setMaxValues(1);
+
+                const row = new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(select);
+
+                await interaction.reply({
+                    content: '### 🛠️ Administracyjne unieważnienie\nWybierz z poniższej listy osobę, której dokumenty mają zostać unieważnione:',
+                    components: [row],
+                    ephemeral: true
+                });
             } else {
                 // User flow - Check if has ID
                 const citizen = await prisma.citizen.findUnique({ where: { discordId } });

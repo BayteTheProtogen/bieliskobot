@@ -2,6 +2,7 @@ import { Client, GatewayIntentBits, REST, Routes, Events } from 'discord.js';
 import * as dotenv from 'dotenv';
 import { dowodCommand } from './commands/dowod';
 import { economyCommands, workCommands, extraWorkCommands } from './commands/economy';
+import { mandatCommand } from './commands/mandat';
 import { handleInteractions } from './handlers/interactions';
 
 dotenv.config();
@@ -34,7 +35,8 @@ client.once(Events.ClientReady, async () => {
                 dowodCommand.data.toJSON(),
                 economyCommands.data.toJSON(),
                 workCommands.data.toJSON(),
-                extraWorkCommands.data.toJSON()
+                extraWorkCommands.data.toJSON(),
+                mandatCommand.data.toJSON()
             ] },
         );
         console.log('Successfully reloaded application (/) commands.');
@@ -59,6 +61,13 @@ client.on('interactionCreate', async interaction => {
             if (interaction.commandName === 'portfel') await economyCommands.execute(interaction);
             if (interaction.commandName === 'praca') await workCommands.execute(interaction);
             if (interaction.commandName === 'dorobka') await extraWorkCommands.execute(interaction);
+            if (interaction.commandName === 'przelej') await economyCommands.execute(interaction);
+        } else if (interaction.commandName === 'mandat') {
+            if (interaction.channelId !== '1490365930818109490') {
+                await interaction.reply({ content: '🚫 Mandaty można wystawiać wyłącznie na kanale <#1490365930818109490>!', ephemeral: true });
+                return;
+            }
+            await mandatCommand.execute(interaction);
         }
     } else {
         await handleInteractions(interaction);
