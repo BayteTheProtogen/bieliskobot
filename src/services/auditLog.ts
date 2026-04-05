@@ -22,11 +22,9 @@ interface PendingAction {
     step: 'REASON' | 'DURATION' | 'DONE';
     reason?: string;
     duration?: string;
-    robloxCommand: string;
 }
 
-// Kolejka akcji: Map<DiscordId, PendingAction[]>
-const adminQueues = new Map<string, PendingAction[]>();
+const pendingActions = new Map<string, PendingAction>();
 
 export async function startAuditLogPolling(client: Client) {
     console.log('👀 Uruchomiono monitoring logów ER:LC...');
@@ -37,13 +35,21 @@ export async function startAuditLogPolling(client: Client) {
             const lastTimestamp = state?.lastProcessedTimestamp ? state.lastProcessedTimestamp.getTime() : 0;
 
             const response = await fetch(`${ERLC_API_URL}?CommandLogs=true`, {
-                headers: { 'Server-Key': process.env.ERLC_SERVER_KEY || '' }
+                headers: { 
+                    'Server-Key': process.env.ERLC_SERVER_KEY || '',
+                    'User-Agent': 'BieliskoBot/1.0.0'
+                }
             });
 
             if (!response.ok) return;
 
             const data = (await response.json()) as any;
-            const logs: CommandLog[] = data.CommandLogs || [];
+            if (!data.CommandLogs) {
+                console.log('ℹ️ Brak logów komend w odpowiedzi API ER:LC.');
+                return;
+            }
+            const logs: CommandLog[] = data.CommandLogs;
+            console.log(`📊 Pobrano ${logs.length} logów z ER:LC. Sprawdzam nowe...`);
 
             // Sortuj logi od najstarszych
             const newLogs = logs
@@ -72,8 +78,13 @@ async function processLog(client: Client, log: CommandLog) {
     const cmd = log.Command.toLowerCase();
     let type: PunishmentType | null = null;
     
-    if (cmd.startsWith(':kick')) type = PunishmentType.KICK;
-    if (cmd.startsWith(':ban')) type = PunishmentType.BAN;
+    // Używamy .includes() dla większej elastyczności obok .startsWith()
+    if (cmd.startsWith(':kick') || cmd.includes(':kick ')) type = PunishmentType.KICK;
+    if (cmd.startsWith(':ban') || cmd.includes(':ban ')) type = PunishmentType.BAN;
+    if (cmd.startsWith(':unban') || cmd.includes(':unban ')) {
+        await handleInGameUnban(client, log);
+        return;
+    }
 
     if (!type) return;
 
@@ -108,40 +119,26 @@ async function processLog(client: Client, log: CommandLog) {
     try {
         const discordUser = await client.users.fetch(admin.discordId);
         
-        const newAction: PendingAction = {
+        pendingActions.set(admin.discordId, {
             adminDiscordId: admin.discordId,
             targetNick,
             type,
-            step: 'REASON',
-            robloxCommand: log.Command
-        };
+            step: 'REASON'
+        });
 
-        const queue = adminQueues.get(admin.discordId) || [];
-        queue.push(newAction);
-        adminQueues.set(admin.discordId, queue);
-
-        // Jeśli to pierwsza akcja w kolejce, zacznij konwersację
-        if (queue.length === 1) {
-            await startActionConversation(discordUser, newAction);
-        }
+        await discordUser.send(`👮‍♂️ Wykryto, że użyłeś komendy w grze: \`${log.Command}\` na graczu **${targetNick}**.\n\n**Dlaczego to zrobiłeś?** (Podaj powód kary)`);
+        await discordUser.send(`💡 *Pamiętaj: Następnym razem użyj komendy \`!bb\` na Discordzie, aby system automatycznie przygotował pełną dokumentację!*`);
         
     } catch (e) {
         console.error(`Nie udało się wysłać DM do admina ${admin.discordId}:`, e);
     }
 }
 
-async function startActionConversation(user: any, action: PendingAction) {
-    await user.send(`👮‍♂️ Wykryto, że użyłeś komendy w grze: \`${action.robloxCommand}\` na graczu **${action.targetNick}**.\n\n**Dlaczego to zrobiłeś?** (Podaj powód kary)`);
-    await user.send(`💡 *Pamiętaj: Następnym razem użyj komendy \`!bb\` na Discordzie, aby system automatycznie przygotował pełną dokumentację!*`);
-}
-
 export async function handleAdminDM(message: Message) {
     if (message.author.bot) return;
     
-    const queue = adminQueues.get(message.author.id);
-    if (!queue || queue.length === 0) return;
-
-    const action = queue[0]; // Zawsze obsługujemy pierwszą akcję z kolejki
+    const action = pendingActions.get(message.author.id);
+    if (!action) return;
 
     if (action.step === 'REASON') {
         action.reason = message.content;
@@ -152,31 +149,17 @@ export async function handleAdminDM(message: Message) {
         } else {
             action.step = 'DONE';
             await finalizeAction(message.client, action);
-            await checkNextInQueue(message.author, message.client);
         }
     } else if (action.step === 'DURATION') {
         action.duration = message.content;
         action.step = 'DONE';
         await finalizeAction(message.client, action);
-        await checkNextInQueue(message.author, message.client);
-    }
-}
-
-async function checkNextInQueue(user: any, client: Client) {
-    const queue = adminQueues.get(user.id);
-    if (!queue) return;
-    
-    queue.shift(); // Usuń zakończoną akcję
-    
-    if (queue.length > 0) {
-        const next = queue[0];
-        await startActionConversation(user, next);
-    } else {
-        adminQueues.delete(user.id);
     }
 }
 
 async function finalizeAction(client: Client, action: PendingAction) {
+    pendingActions.delete(action.adminDiscordId);
+    
     const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
     if (!logChannel?.isTextBased()) return;
 
@@ -237,4 +220,59 @@ async function finalizeAction(client: Client, action: PendingAction) {
     }
 
     await client.users.send(action.adminDiscordId, '✅ Akcja została zapisana i zalogowana w systemie Bielisko. Dziękuję!');
+}
+
+async function handleInGameUnban(client: Client, log: CommandLog) {
+    const parts = log.Command.split(' ');
+    const targetNick = parts[1];
+    if (!targetNick) return;
+
+    console.log(`🔓 Wykryto unban w grze dla: ${targetNick}`);
+
+    const citizen = await prisma.citizen.findFirst({
+        where: { robloxNick: { equals: targetNick, mode: 'insensitive' } }
+    });
+
+    if (citizen) {
+        // Aktulizacja bazy
+        await prisma.citizen.update({
+            where: { discordId: citizen.discordId },
+            data: { isPermBanned: false, bannedUntil: null }
+        });
+
+        // Edycja historycznych logów
+        const activePunishments = await prisma.punishment.findMany({
+            where: { citizenId: citizen.discordId, isActive: true }
+        });
+
+        const banRoom = client.channels.cache.get('1490073045002485991'); // Korzystamy z banroomu
+        if (banRoom?.isTextBased()) {
+            for (const p of activePunishments) {
+                try {
+                    const msg = await (banRoom as any).messages.fetch(p.messageId);
+                    if (msg) {
+                        const embed = EmbedBuilder.from(msg.embeds[0])
+                            .setColor('#2ecc71')
+                            .setTitle(msg.embeds[0].title + ' 🔓 ODBANOWANO');
+                        await msg.edit({ embeds: [embed] });
+                    }
+                } catch (e) {
+                    console.error(`Nie udało się edytować wiadomości ${p.messageId}:`, e);
+                }
+            }
+        }
+
+        await prisma.punishment.updateMany({
+            where: { citizenId: citizen.discordId, isActive: true },
+            data: { isActive: false }
+        });
+
+        // Powiadomienie admina (jeśli zarejestrowany)
+        const admin = await prisma.citizen.findFirst({ where: { robloxId: log.UserId.toString() } });
+        if (admin) {
+            try {
+                await client.users.send(admin.discordId, `✅ Wykryto, że odbanowałeś gracza **${targetNick}** w grze. System zaktualizował profil gracza i logi.`);
+            } catch {}
+        }
+    }
 }

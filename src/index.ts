@@ -97,7 +97,8 @@ client.on(Events.MessageCreate, async (message) => {
 
     if (!message.content.startsWith('!bb ')) return;
 
-    const BAN_ROOM_ID = '1490303478965207181';
+    const BAN_ROOM_ID = '1490073045002485991'; // Kanał z obrazkami "za kratami"
+    const KICK_LOG_ID = '1490303478965207181'; // Kanał dla kicków i logów akcji
     const ADMIN_CHANNEL_ID = '1490274396391211158';
     const OWNER_ROLE_ID = '1490053669830393996';
 
@@ -143,10 +144,10 @@ client.on(Events.MessageCreate, async (message) => {
                 )
                 .setTimestamp();
             
-            const banroom = client.channels.cache.get(BAN_ROOM_ID);
+            const kickLog = client.channels.cache.get(KICK_LOG_ID);
             let sentMsgId: string | undefined;
-            if (banroom?.isTextBased()) {
-                const sent = await (banroom as any).send({ embeds: [embed] });
+            if (kickLog?.isTextBased()) {
+                const sent = await (kickLog as any).send({ embeds: [embed] });
                 sentMsgId = sent.id;
             }
 
