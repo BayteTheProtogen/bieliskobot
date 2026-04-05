@@ -92,8 +92,25 @@ client.on(Events.MessageCreate, async message => {
 
     if (message.channelId !== ADMIN_CHANNEL_ID) return;
 
-    const args = message.content.slice(4).split(' ');
+    const args = message.content.slice(4).trim().split(' ');
     const command = args[0].toLowerCase();
+
+    const helpEmbed = new EmbedBuilder()
+        .setTitle('🛠️ Panel Moderacji BieliskoBot (!bb)')
+        .setColor('#34495e')
+        .setDescription('Zdalne zarządzanie serwerem ER:LC. Komendy dostępne tylko na tym kanale.')
+        .addFields(
+            { name: '⚖️ Wyrzucenie', value: '`!bb kick [nick] [powód]` - Wyrzuca gracza z gry.', inline: false },
+            { name: '⛓️ Tempban', value: '`!bb tempban [nick] [czas_h] [powód]` - Ban czasowy + stempel na dowód.', inline: false },
+            { name: '💀 Permban', value: '`!bb permban [nick] [powód]` - Ban stały (Tylko Owner).', inline: false },
+            { name: '🔓 Unban', value: '`!bb unban [nick]` - Zdjęcie kary i czyszczenie bazy.', inline: false }
+        )
+        .setFooter({ text: 'RP Bielisko - System Moderacji' })
+        .setTimestamp();
+
+    if (!command || !['kick', 'tempban', 'permban', 'unban'].includes(command)) {
+        return message.reply({ embeds: [helpEmbed] });
+    }
 
     // !bb kick [nick] [reason...]
     if (command === 'kick') {

@@ -22,9 +22,10 @@ ERLC_SERVER_KEY=twoj_klucz_api_erlc
 Centralny punkt bota, pozwalający na rejestrację obywateli i generowanie unikalnych dokumentów.
 
 ### Komendy:
-*   `/dowod wyrob` – Otwiera modal do wprowadzenia danych (Imię, Nazwisko, Data Urodzenia, Płeć, Nick Roblox).
-*   `/dowod pokaz` – Generuje proceduralną grafikę dowodu osobistego.
-*   `/dowod uniewaznij` – (Tylko Admin/Owner) Pozwala unieważnić dowód wybranego gracza.
+*   `/dowod wyrob [nick]` – Rozpoczyna proces wyrabiania dowodu (wymaga podania nicku Roblox).
+*   `/dowod zaktualizuj [nick]` – Pozwala zmienić dane w istniejącym dowodzie.
+*   `/dowod pokaz` – Wyświetla grafikę dowodu. **Admin:** Może wybrać dowolnego gracza z listy, aby sprawdzić jego dokument.
+*   `/dowod uniewaznij` – Użytkownik może zgłosić swój dowód do unieważnienia. **Admin:** Może natychmiastowo unieważnić dowód wybranego gracza za pomocą menu wyboru.
 
 ### Funkcje Premium:
 *   **Proceduralne ID**: Każdy dowód posiada unikalny numer, wzór giloszowy, hologram orła oraz strefę MRZ.
