@@ -2,15 +2,42 @@ import { Interaction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowB
 import { prisma } from '../services/db';
 import { generateIDCard } from '../services/canvas';
 import { getAvatarBust, getUserInfo } from '../services/roblox';
+import { Guild } from 'discord.js';
+
+async function invalidateCitizen(discordId: string, guild: Guild | null) {
+    const citizen = await prisma.citizen.findUnique({ where: { discordId } });
+    if (!citizen) return false;
+
+    // Usuń z bazy
+    await prisma.citizen.delete({ where: { discordId } });
+
+    // Zdejmij rolę i zresetuj nick
+    if (guild) {
+        try {
+            const member = await guild.members.fetch(discordId);
+            const roleId = '1490075447629971467';
+            if (member.roles.cache.has(roleId)) {
+                await member.roles.remove(roleId);
+            }
+            // Zresetuj nick (ustawienie na null przywraca domyślny)
+            await member.setNickname(null);
+        } catch (e) {
+            console.error('Błąd podczas czyszczenia profilu użytkownika po unieważnieniu:', e);
+        }
+    }
+    return citizen;
+}
+
 
 export async function handleInteractions(interaction: Interaction) {
     if (interaction.isButton()) {
         const { customId } = interaction;
 
-        if (customId === 'roblox_no') {
-            await interaction.update({ content: 'Anulowano. Spróbuj podać dokładny Nick.', embeds: [], components: [] });
+        if (customId === 'roblox_no' || customId === 'uniewaznij_cancel') {
+            await interaction.update({ content: 'Anulowano.', embeds: [], components: [] });
             return;
         }
+
 
         if (customId.startsWith('roblox_yes|')) {
             const parts = customId.split('|');
@@ -169,6 +196,90 @@ export async function handleInteractions(interaction: Interaction) {
                 await interaction.showModal(modal);
             }
         }
+
+        if (customId === 'uniewaznij_user_confirm') {
+            const pending = await prisma.pendingInvalidation.create({
+                data: { discordId: interaction.user.id }
+            });
+
+            const adminChannel = await interaction.client.channels.fetch('1490393894448271370');
+            if (adminChannel && adminChannel.isTextBased() && 'send' in adminChannel) {
+                const citizen = await prisma.citizen.findUnique({ where: { discordId: interaction.user.id } });
+                const embed = new EmbedBuilder()
+                    .setTitle(`Urząd: Wniosek o unieważnienie dowodu`)
+                    .setDescription(`Użytkownik <@${interaction.user.id}> prosiego o **permanentne unieważnienie** swojego dowodu osobistego.`)
+                    .addFields(
+                        { name: 'Obywatel', value: `${citizen?.firstName} ${citizen?.lastName}`, inline: true },
+                        { name: 'Nick Roblox', value: `${citizen?.robloxNick}`, inline: true }
+                    )
+                    .setColor('#ff4500')
+                    .setFooter({ text: `ID Wniosku: INV-${pending.id}` });
+
+                const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                    new ButtonBuilder().setCustomId(`admin_uniewaznij_approve_${pending.id}`).setLabel('✅ Zatwierdź unieważnienie').setStyle(ButtonStyle.Danger),
+                    new ButtonBuilder().setCustomId(`admin_uniewaznij_reject_${pending.id}`).setLabel('❌ Odrzuć').setStyle(ButtonStyle.Secondary)
+                );
+
+                await adminChannel.send({ embeds: [embed], components: [row] });
+                await interaction.update({ content: '✅ Twoje podanie o unieważnienie dowodu zostało wysłane do Urzędu.', components: [] });
+            }
+            return;
+        }
+
+        if (customId.startsWith('uniewaznij_owner_confirm|')) {
+            const targetDiscordId = customId.split('|')[1];
+            const citizen = await invalidateCitizen(targetDiscordId, interaction.guild);
+            
+            if (citizen) {
+                await interaction.update({ content: `✅ Pomyślnie unieważniono dowód obywatela: **${citizen.firstName} ${citizen.lastName}**.`, components: [] });
+                // Powiadomienie na DM
+                try {
+                    const user = await interaction.client.users.fetch(targetDiscordId);
+                    await user.send('⚠️ Twój dowód osobisty został **unieważniony przez Właściciela serwera**. Twoje dane RP zostały usunięte.');
+                } catch(e) {}
+            } else {
+                await interaction.update({ content: '❌ Nie znaleziono aktywnego dowodu dla tego użytkownika.', components: [] });
+            }
+            return;
+        }
+
+        if (customId.startsWith('admin_uniewaznij_')) {
+            const isApprove = customId.startsWith('admin_uniewaznij_approve_');
+            const requestId = parseInt(customId.split('_').pop() || '0', 10);
+
+            const pending = await prisma.pendingInvalidation.findUnique({ where: { id: requestId } });
+            if (!pending) {
+                return interaction.update({ content: 'To podanie już nie istnieje.', embeds: [], components: [] });
+            }
+
+            if (isApprove) {
+                const citizen = await invalidateCitizen(pending.discordId, interaction.guild);
+                await prisma.pendingInvalidation.delete({ where: { id: requestId } });
+
+                const oldEmbed = interaction.message.embeds[0];
+                const newEmbed = EmbedBuilder.from(oldEmbed).setColor('#000000').setTitle('Urząd: Dowód Unieważniony 💀');
+                await interaction.update({ embeds: [newEmbed], components: [] });
+
+                if (citizen) {
+                    try {
+                        const user = await interaction.client.users.fetch(pending.discordId);
+                        await user.send('✅ Urząd **zatwierdził** Twoją prośbę. Twój dowód został unieważniony, a dane RP usunięte.');
+                    } catch(e) {}
+                }
+            } else {
+                await prisma.pendingInvalidation.delete({ where: { id: requestId } });
+                const oldEmbed = interaction.message.embeds[0];
+                const newEmbed = EmbedBuilder.from(oldEmbed).setColor('#808080').setTitle('Urząd: Wniosek o unieważnienie odrzucony ❌');
+                await interaction.update({ embeds: [newEmbed], components: [] });
+
+                try {
+                    const user = await interaction.client.users.fetch(pending.discordId);
+                    await user.send('❌ Twoja prośba o unieważnienie dowodu została **odrzucona** przez Urząd.');
+                } catch(e) {}
+            }
+            return;
+        }
+
     } else if (interaction.isModalSubmit()) {
         if (interaction.customId.startsWith('admin_reason_modal_')) {
             const updateId = parseInt(interaction.customId.replace('admin_reason_modal_', ''), 10);
