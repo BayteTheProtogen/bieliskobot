@@ -69,7 +69,7 @@ export async function handleInteractions(interaction: Interaction) {
             await interaction.showModal(modal);
         }
 
-        if (customId.startsWith('admin_')) {
+        if (customId.startsWith('admin_') && !customId.startsWith('admin_approve_inv_') && !customId.startsWith('admin_reject_inv_')) {
             const isApprove = customId.startsWith('admin_approve_');
             const isReject = customId.startsWith('admin_reject_');
             const isReason = customId.startsWith('admin_reason_');
@@ -167,18 +167,6 @@ export async function handleInteractions(interaction: Interaction) {
                 const row = new ActionRowBuilder<TextInputBuilder>().addComponents(reasonInput);
                 modal.addComponents(row);
                 await interaction.showModal(modal);
-            } else if (isReason) {
-                const modal = new ModalBuilder()
-                    .setCustomId(`admin_reason_modal_${updateId}`)
-                    .setTitle('Powód odrzucenia');
-                const reasonInput = new TextInputBuilder()
-                    .setCustomId('reason')
-                    .setLabel("Dlaczego odrzucasz ten wniosek?")
-                    .setStyle(TextInputStyle.Paragraph)
-                    .setRequired(true);
-                const row = new ActionRowBuilder<TextInputBuilder>().addComponents(reasonInput);
-                modal.addComponents(row);
-                await interaction.showModal(modal);
             }
         }
 
@@ -257,6 +245,11 @@ export async function handleInteractions(interaction: Interaction) {
                 const oldEmbed = interaction.message.embeds[0];
                 const newEmbed = EmbedBuilder.from(oldEmbed).setColor('#808080').setTitle('Urząd: Wniosek o unieważnienie Odrzucony ❌');
                 await interaction.update({ embeds: [newEmbed], components: [] });
+
+                try {
+                    const user = await interaction.client.users.fetch(pending.discordId);
+                    if (user) await user.send('❌ Urząd odrzucił Twój wniosek o unieważnienie dowodu osobistego.');
+                } catch(e) {}
             }
         }
 
