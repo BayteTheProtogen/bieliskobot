@@ -59,15 +59,16 @@ export async function startAuditLogPolling(client: Client) {
             for (const log of newLogs) {
                 try {
                     await processLog(client, log);
-                    // Aktualizuj state po każdym przetworzeniu, aby nie powtarzać w razie błędu
-                    await prisma.auditLogState.upsert({
-                        where: { id: 1 },
-                        update: { lastProcessedTimestamp: new Date(log.Timestamp * 1000) },
-                        create: { id: 1, lastProcessedTimestamp: new Date(log.Timestamp * 1000) }
-                    });
                 } catch (e) {
                     console.error(`❌ Błąd przy logu ${log.Command}:`, e);
                 }
+                
+                // Zawsze aktualizuj state, by nie blokować pętli "trefnym" logiem
+                await prisma.auditLogState.upsert({
+                    where: { id: 1 },
+                    update: { lastProcessedTimestamp: new Date(log.Timestamp * 1000) },
+                    create: { id: 1, lastProcessedTimestamp: new Date(log.Timestamp * 1000) }
+                });
             }
         } catch (error) {
             console.error('Błąd podczas odpytywania API ER:LC:', error);
@@ -107,8 +108,8 @@ async function processLog(client: Client, log: CommandLog) {
                 .setTitle('⚠️ Wykryto akcję w grze (Admin Niezarejestrowany)')
                 .setColor('#95a5a6')
                 .addFields(
-                    { name: 'Admin (Roblox)', value: log.Username, inline: true },
-                    { name: 'Akcja', value: log.Command, inline: true },
+                    { name: 'Admin (Roblox)', value: log.Username || 'Nieznany', inline: true },
+                    { name: 'Akcja', value: log.Command || 'Brak', inline: true },
                     { name: 'Uwaga', value: 'Bot nie mógł wysłać DM do admina, ponieważ nie ma on profilu.' }
                 )
                 .setTimestamp();
