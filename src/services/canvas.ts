@@ -209,6 +209,108 @@ export async function generateIDCard(data: CitizenData, avatarUrl: string): Prom
     ctx.fillText(mrzLine1, 60, mrzY + 40);
     ctx.fillText(mrzLine2, 60, mrzY + 75);
 
+    // 9. STEMPEL "OSADZONY" (Jeśli zbanowany)
+    const now = new Date();
+    // @ts-ignore
+    const isTempBanned = data.bannedUntil && new Date(data.bannedUntil) > now;
+    // @ts-ignore
+    if (data.isPermBanned || isTempBanned) {
+        ctx.save();
+        ctx.translate(width / 2, height / 2);
+        ctx.rotate(-0.3);
+        ctx.globalAlpha = 0.8;
+        ctx.strokeStyle = '#c0392b';
+        ctx.lineWidth = 8;
+        
+        // Ramka stempla
+        ctx.strokeRect(-200, -60, 400, 120);
+
+        // Tekst stempla
+        ctx.fillStyle = '#c0392b';
+        ctx.font = 'bold 70px Roboto';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('OSADZONY', 0, 0);
+
+        // Lekki efekt "zużycia" stempla (proceduralnie)
+        ctx.globalAlpha = 0.2;
+        ctx.fillStyle = '#ffffff';
+        for (let i = 0; i < 50; i++) {
+            ctx.beginPath();
+            ctx.arc(Math.random() * 400 - 200, Math.random() * 120 - 60, Math.random() * 3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    return canvas.toBuffer('image/png');
+}
+
+export async function generatePrisonerCard(avatarUrl: string): Promise<Buffer> {
+    const width = 800;
+    const height = 800;
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+
+    // 1. Tło i Avatar
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(0, 0, width, height);
+
+    if (avatarUrl) {
+        try {
+            const avatar = await loadImage(avatarUrl);
+            ctx.save();
+            ctx.drawImage(avatar, 50, 50, 700, 700);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+            ctx.fillRect(50, 50, 700, 700);
+            ctx.restore();
+        } catch (e) {
+            console.error('Błąd ładowania avatara do karty więźnia:', e);
+        }
+    }
+
+    // 2. KRATY (Proceduralnie)
+    ctx.strokeStyle = '#333333';
+    ctx.lineWidth = 40;
+    
+    const barCount = 6;
+    const barSpacing = width / (barCount + 1);
+    
+    for (let i = 1; i <= barCount; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * barSpacing, 0);
+        ctx.lineTo(i * barSpacing, height);
+        ctx.stroke();
+    }
+
+    // Poziome belki
+    ctx.beginPath();
+    ctx.moveTo(0, height * 0.3);
+    ctx.lineTo(width, height * 0.3);
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.moveTo(0, height * 0.7);
+    ctx.lineTo(width, height * 0.7);
+    ctx.stroke();
+
+    // 3. STEMPEL "OSADZONY"
+    ctx.save();
+    ctx.translate(width / 2, height / 2);
+    ctx.rotate(-0.15);
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = '#e74c3c';
+    ctx.lineWidth = 12;
+    
+    ctx.strokeRect(-250, -80, 500, 160);
+
+    ctx.fillStyle = '#e74c3c';
+    ctx.font = 'bold 90px Roboto';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('OSADZONY', 0, 0);
+    ctx.restore();
+
     return canvas.toBuffer('image/png');
 }
 
