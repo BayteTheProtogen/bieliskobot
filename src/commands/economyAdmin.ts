@@ -56,7 +56,7 @@ export const economyAdminCommands = {
         const amount = interaction.options.getInteger('kwota') || 0;
         const place = interaction.options.getString('miejsce') || '';
 
-        const target = await prisma.citizen.findFirst({ where: { robloxNick: targetNick } });
+        const target = await prisma.citizen.findFirst({ where: { robloxNick: { equals: targetNick, mode: 'insensitive' } } });
 
         if (!target) {
             return interaction.reply({ content: `🚫 Nie znaleziono w bazie obywatela o nicku Roblox: **${targetNick}**.`, ephemeral: true });

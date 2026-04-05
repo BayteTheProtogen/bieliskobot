@@ -77,7 +77,7 @@ export const economyCommands = {
                 return interaction.reply({ content: `🚫 Nie masz tyle w kieszeni! (Posiadasz: ${citizen.pocket} zł)`, ephemeral: true });
             }
 
-            const targetCitizen = await prisma.citizen.findFirst({ where: { robloxNick: targetNick } });
+            const targetCitizen = await prisma.citizen.findFirst({ where: { robloxNick: { equals: targetNick, mode: 'insensitive' } } });
             if (!targetCitizen) {
                 return interaction.reply({ content: `🚫 Nie znaleziono obywatela o nicku Roblox: **${targetNick}**.`, ephemeral: true });
             }

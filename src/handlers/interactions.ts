@@ -396,7 +396,7 @@ export async function handleInteractions(interaction: Interaction) {
 
         if (interaction.customId === 'admin_uniewaznij_modal') {
             const targetNick = interaction.fields.getTextInputValue('targetNick');
-            const citizen = await prisma.citizen.findFirst({ where: { robloxNick: targetNick } });
+            const citizen = await prisma.citizen.findFirst({ where: { robloxNick: { equals: targetNick, mode: 'insensitive' } } });
 
             if (!citizen) {
                 return interaction.reply({ content: `🚫 Nie znaleziono w bazie obywatela z nickiem Roblox: **${targetNick}**.`, ephemeral: true });
@@ -426,7 +426,7 @@ export async function handleInteractions(interaction: Interaction) {
                 return interaction.reply({ content: '🚫 Nieprawidłowa kwota mandatu.', ephemeral: true });
             }
 
-            const target = await prisma.citizen.findFirst({ where: { robloxNick: targetNick } });
+            const target = await prisma.citizen.findFirst({ where: { robloxNick: { equals: targetNick, mode: 'insensitive' } } });
             if (!target) {
                 return interaction.reply({ content: `🚫 Nie znaleziono w bazie obywatela o nicku: **${targetNick}**.`, ephemeral: true });
             }
