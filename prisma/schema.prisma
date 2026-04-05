@@ -17,6 +17,10 @@ model Citizen {
   gender        String
   citizenship   String
   citizenNumber String
+  pocket        Int      @default(0)
+  bank          Int      @default(0)
+  lastWork      DateTime?
+  lastExtra     DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
@@ -38,12 +42,4 @@ model PendingInvalidation {
   id        Int      @id @default(autoincrement())
   discordId String
   createdAt DateTime @default(now())
-}
-
-model Economy {
-  discordId String    @id
-  pocket    Int       @default(0)
-  bank      Int       @default(0)
-  lastJob   DateTime?
-  lastExtra DateTime?
 }

@@ -1,9 +1,7 @@
 import { Client, GatewayIntentBits, REST, Routes, Events } from 'discord.js';
 import * as dotenv from 'dotenv';
 import { dowodCommand } from './commands/dowod';
-import { pracaCommand } from './commands/praca';
-import { dorobkaCommand } from './commands/dorobka';
-import { ekonomiaCommand } from './commands/ekonomia';
+import { economyCommands, workCommands, extraWorkCommands } from './commands/economy';
 import { handleInteractions } from './handlers/interactions';
 
 dotenv.config();
@@ -34,9 +32,9 @@ client.once(Events.ClientReady, async () => {
             Routes.applicationCommands(clientId),
             { body: [
                 dowodCommand.data.toJSON(),
-                pracaCommand.data.toJSON(),
-                dorobkaCommand.data.toJSON(),
-                ekonomiaCommand.data.toJSON()
+                economyCommands.data.toJSON(),
+                workCommands.data.toJSON(),
+                extraWorkCommands.data.toJSON()
             ] },
         );
         console.log('Successfully reloaded application (/) commands.');
@@ -53,12 +51,12 @@ client.on('interactionCreate', async interaction => {
                 return;
             }
             await dowodCommand.execute(interaction);
+        } else if (interaction.commandName === 'portfel') {
+            await economyCommands.execute(interaction);
         } else if (interaction.commandName === 'praca') {
-            await pracaCommand.execute(interaction);
+            await workCommands.execute(interaction);
         } else if (interaction.commandName === 'dorobka') {
-            await dorobkaCommand.execute(interaction);
-        } else if (interaction.commandName === 'ekonomia') {
-            await ekonomiaCommand.execute(interaction);
+            await extraWorkCommands.execute(interaction);
         }
     } else {
         await handleInteractions(interaction);
