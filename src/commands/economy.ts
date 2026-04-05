@@ -65,7 +65,38 @@ export const economyCommands = {
         }
 
         if (subcommand === 'wplac' || subcommand === 'wyplac') {
-            // ... (keeping existing logic which is now shifted down)
+            const amountInput = interaction.options.getString('kwota', true);
+            let amount = 0;
+
+            if (amountInput.toLowerCase() === 'all') {
+                amount = subcommand === 'wplac' ? citizen.pocket : citizen.bank;
+            } else {
+                amount = parseInt(amountInput);
+            }
+
+            if (isNaN(amount) || amount <= 0) {
+                return interaction.reply({ content: '🚫 Podaj poprawną kwotę (liczbę lub słowo "all").', ephemeral: true });
+            }
+
+            if (subcommand === 'wplac') {
+                if (citizen.pocket < amount) {
+                    return interaction.reply({ content: `🚫 Nie masz tyle gotówki w kieszeni! (Posiadasz: ${citizen.pocket} zł)`, ephemeral: true });
+                }
+                await prisma.citizen.update({
+                    where: { discordId },
+                    data: { pocket: { decrement: amount }, bank: { increment: amount } }
+                });
+                return interaction.reply({ content: `✅ Wpłacono **${amount.toLocaleString()} zł** do Twojego banku.` });
+            } else {
+                if (citizen.bank < amount) {
+                    return interaction.reply({ content: `🚫 Nie masz tyle w banku! (Posiadasz: ${citizen.bank} zł)`, ephemeral: true });
+                }
+                await prisma.citizen.update({
+                    where: { discordId },
+                    data: { bank: { decrement: amount }, pocket: { increment: amount } }
+                });
+                return interaction.reply({ content: `✅ Wypłacono **${amount.toLocaleString()} zł** z konta bankowego do kieszeni.` });
+            }
         }
 
         if (subcommand === 'przelej') {
