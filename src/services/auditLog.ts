@@ -57,16 +57,17 @@ export async function startAuditLogPolling(client: Client) {
                 .sort((a, b) => a.Timestamp - b.Timestamp);
 
             for (const log of newLogs) {
-                await processLog(client, log);
-            }
-
-            if (newLogs.length > 0) {
-                const latest = newLogs[newLogs.length - 1];
-                await prisma.auditLogState.upsert({
-                    where: { id: 1 },
-                    update: { lastProcessedTimestamp: new Date(latest.Timestamp * 1000) },
-                    create: { id: 1, lastProcessedTimestamp: new Date(latest.Timestamp * 1000) }
-                });
+                try {
+                    await processLog(client, log);
+                    // Aktualizuj state po każdym przetworzeniu, aby nie powtarzać w razie błędu
+                    await prisma.auditLogState.upsert({
+                        where: { id: 1 },
+                        update: { lastProcessedTimestamp: new Date(log.Timestamp * 1000) },
+                        create: { id: 1, lastProcessedTimestamp: new Date(log.Timestamp * 1000) }
+                    });
+                } catch (e) {
+                    console.error(`❌ Błąd przy logu ${log.Command}:`, e);
+                }
             }
         } catch (error) {
             console.error('Błąd podczas odpytywania API ER:LC:', error);
@@ -94,9 +95,9 @@ async function processLog(client: Client, log: CommandLog) {
     if (!targetNick) return;
 
     // Znajdź admina na Discordzie
-    const admin = await prisma.citizen.findFirst({
+    const admin = log.UserId ? await prisma.citizen.findFirst({
         where: { robloxId: log.UserId.toString() }
-    });
+    }) : null;
 
     const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
 
@@ -264,15 +265,17 @@ async function handleInGameUnban(client: Client, log: CommandLog) {
 
         await prisma.punishment.updateMany({
             where: { citizenId: citizen.discordId, isActive: true },
-            data: { isActive: false }
+            data: { isActive: false, resolvedAt: new Date() }
         });
 
-        // Powiadomienie admina (jeśli zarejestrowany)
-        const admin = await prisma.citizen.findFirst({ where: { robloxId: log.UserId.toString() } });
-        if (admin) {
-            try {
-                await client.users.send(admin.discordId, `✅ Wykryto, że odbanowałeś gracza **${targetNick}** w grze. System zaktualizował profil gracza i logi.`);
-            } catch {}
+        // Powiadomienie admina (jeśli zarejestrowany i mamy jego ID)
+        if (log.UserId) {
+            const admin = await prisma.citizen.findFirst({ where: { robloxId: log.UserId.toString() } });
+            if (admin) {
+                try {
+                    await client.users.send(admin.discordId, `✅ Wykryto, że odbanowałeś gracza **${targetNick}** w grze. System zaktualizował profil gracza i logi.`);
+                } catch {}
+            }
         }
     }
 }
