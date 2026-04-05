@@ -5,7 +5,7 @@ import { generatePrisonerCard } from './canvas';
 import { AttachmentBuilder } from 'discord.js';
 
 const ERLC_API_URL = 'https://api.policeroleplay.community/v2/server';
-const POLL_INTERVAL = 10 * 60 * 1000; // 10 minut
+const POLL_INTERVAL = 2 * 60 * 1000; // 2 minuty
 const LOG_CHANNEL_ID = '1490303478965207181';
 
 interface CommandLog {
@@ -22,9 +22,11 @@ interface PendingAction {
     step: 'REASON' | 'DURATION' | 'DONE';
     reason?: string;
     duration?: string;
+    robloxCommand: string;
 }
 
-const pendingActions = new Map<string, PendingAction>();
+// Kolejka akcji: Map<DiscordId, PendingAction[]>
+const adminQueues = new Map<string, PendingAction[]>();
 
 export async function startAuditLogPolling(client: Client) {
     console.log('👀 Uruchomiono monitoring logów ER:LC...');
@@ -106,26 +108,40 @@ async function processLog(client: Client, log: CommandLog) {
     try {
         const discordUser = await client.users.fetch(admin.discordId);
         
-        pendingActions.set(admin.discordId, {
+        const newAction: PendingAction = {
             adminDiscordId: admin.discordId,
             targetNick,
             type,
-            step: 'REASON'
-        });
+            step: 'REASON',
+            robloxCommand: log.Command
+        };
 
-        await discordUser.send(`👮‍♂️ Wykryto, że użyłeś komendy w grze: \`${log.Command}\` na graczu **${targetNick}**.\n\n**Dlaczego to zrobiłeś?** (Podaj powód kary)`);
-        await discordUser.send(`💡 *Pamiętaj: Następnym razem użyj komendy \`!bb\` na Discordzie, aby system automatycznie przygotował pełną dokumentację!*`);
+        const queue = adminQueues.get(admin.discordId) || [];
+        queue.push(newAction);
+        adminQueues.set(admin.discordId, queue);
+
+        // Jeśli to pierwsza akcja w kolejce, zacznij konwersację
+        if (queue.length === 1) {
+            await startActionConversation(discordUser, newAction);
+        }
         
     } catch (e) {
         console.error(`Nie udało się wysłać DM do admina ${admin.discordId}:`, e);
     }
 }
 
+async function startActionConversation(user: any, action: PendingAction) {
+    await user.send(`👮‍♂️ Wykryto, że użyłeś komendy w grze: \`${action.robloxCommand}\` na graczu **${action.targetNick}**.\n\n**Dlaczego to zrobiłeś?** (Podaj powód kary)`);
+    await user.send(`💡 *Pamiętaj: Następnym razem użyj komendy \`!bb\` na Discordzie, aby system automatycznie przygotował pełną dokumentację!*`);
+}
+
 export async function handleAdminDM(message: Message) {
     if (message.author.bot) return;
     
-    const action = pendingActions.get(message.author.id);
-    if (!action) return;
+    const queue = adminQueues.get(message.author.id);
+    if (!queue || queue.length === 0) return;
+
+    const action = queue[0]; // Zawsze obsługujemy pierwszą akcję z kolejki
 
     if (action.step === 'REASON') {
         action.reason = message.content;
@@ -136,17 +152,31 @@ export async function handleAdminDM(message: Message) {
         } else {
             action.step = 'DONE';
             await finalizeAction(message.client, action);
+            await checkNextInQueue(message.author, message.client);
         }
     } else if (action.step === 'DURATION') {
         action.duration = message.content;
         action.step = 'DONE';
         await finalizeAction(message.client, action);
+        await checkNextInQueue(message.author, message.client);
+    }
+}
+
+async function checkNextInQueue(user: any, client: Client) {
+    const queue = adminQueues.get(user.id);
+    if (!queue) return;
+    
+    queue.shift(); // Usuń zakończoną akcję
+    
+    if (queue.length > 0) {
+        const next = queue[0];
+        await startActionConversation(user, next);
+    } else {
+        adminQueues.delete(user.id);
     }
 }
 
 async function finalizeAction(client: Client, action: PendingAction) {
-    pendingActions.delete(action.adminDiscordId);
-    
     const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
     if (!logChannel?.isTextBased()) return;
 
