@@ -141,7 +141,8 @@ export const dowodCommand = {
 
         if (subcommand === 'uniewaznij') {
             const ownerId = '1490053669830393996';
-            if (interaction.user.id === ownerId) {
+            const isOwner = interaction.user.id === ownerId || (interaction.member?.roles as any).cache.has(ownerId);
+            if (isOwner) {
                 // Owner flow - Show User Select Menu
                 const select = new UserSelectMenuBuilder()
                     .setCustomId('admin_select_uniewaznij')
