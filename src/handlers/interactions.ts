@@ -19,6 +19,13 @@ export async function handleInteractions(interaction: Interaction) {
 
             const action = parts[3];
 
+            if (action === 'create') {
+                const existing = await prisma.citizen.findUnique({ where: { discordId: interaction.user.id } });
+                if (existing) {
+                    return interaction.update({ content: '🚫 Posiadasz już wyrobiony dowód osobisty! Jeśli chcesz zmienić dane, użyj `/dowod zaktualizuj`.', embeds: [], components: [] });
+                }
+            }
+
             // Pokaż modal formularz
             const modal = new ModalBuilder()
                 .setCustomId(`modal_id_${robloxUserId}|${nick}|${action}`)
