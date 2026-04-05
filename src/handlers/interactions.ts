@@ -27,6 +27,31 @@ export async function handleInteractions(interaction: Interaction) {
             });
             return;
         }
+
+        if (interaction.customId === 'admin_select_pokaz') {
+            const targetDiscordId = interaction.values[0];
+            await interaction.deferReply({ ephemeral: true });
+
+            const citizen = await prisma.citizen.findUnique({ where: { discordId: targetDiscordId } });
+
+            if (!citizen) {
+                return interaction.editReply({ content: '🚫 Ten użytkownik nie posiada wyrobionego dowodu osobistego.' });
+            }
+
+            try {
+                const avatarBustUrl = await getAvatarBust(citizen.robloxId);
+                const buffer = await generateIDCard(citizen, avatarBustUrl || '');
+                const attachment = new AttachmentBuilder(buffer, { name: 'dowod.png' });
+
+                await interaction.editReply({
+                    content: `### 🪪 Podgląd dowodu: ${citizen.firstName} ${citizen.lastName}\nOto aktualny dokument obywatela:`,
+                    files: [attachment]
+                });
+            } catch (e) {
+                await interaction.editReply({ content: 'Wystąpił błąd podczas generowania dowodu.' });
+            }
+            return;
+        }
     }
 
     if (interaction.isButton()) {

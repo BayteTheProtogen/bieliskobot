@@ -41,6 +41,25 @@ export const dowodCommand = {
         const discordId = interaction.user.id;
 
         if (subcommand === 'pokaz') {
+            const ownerId = '1490053669830393996';
+            const isOwner = interaction.user.id === ownerId || (interaction.member?.roles as any).cache.has(ownerId);
+
+            if (isOwner) {
+                const select = new UserSelectMenuBuilder()
+                    .setCustomId('admin_select_pokaz')
+                    .setPlaceholder('Wybierz osobę, której chcesz podejrzeć dowód')
+                    .setMinValues(1)
+                    .setMaxValues(1);
+
+                const row = new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(select);
+
+                return interaction.reply({
+                    content: '### 🛠️ Administracyjny podgląd dowodu\nWybierz z poniższej listy osobę, której dokument chcesz zobaczyć:',
+                    components: [row],
+                    ephemeral: true
+                });
+            }
+
             await interaction.deferReply();
             try {
                 const citizen = await prisma.citizen.findUnique({ where: { discordId } });

@@ -168,7 +168,7 @@ export async function generateIDCard(data: CitizenData, avatarUrl: string): Prom
     drawModernField('Obywatelstwo / Nationality', data.citizenship, dataX, dataY + spacing * 2);
     
     drawModernField('Data urodzenia / Birth', data.dob, dataX, dataY + spacing * 3);
-    drawModernField('Płeć / Sex', data.gender, dataX + 270, dataY + spacing * 3);
+    drawModernField('Płeć / Sex', data.gender, dataX + 210, dataY + spacing * 3);
     
     // Numer seryjny (Citizen No) w dolnym rogu
     ctx.textAlign = 'right';
