@@ -269,11 +269,12 @@ export async function generatePrisonerCard(avatarUrl: string): Promise<Buffer> {
         }
     }
 
-    // 2. KRATY (Proceduralnie)
-    ctx.strokeStyle = '#333333';
-    ctx.lineWidth = 40;
+    // 2. KRATY (Proceduralnie - Bardziej widoczne)
+    ctx.strokeStyle = '#4b5563'; // Jaśniejszy szary dla lepszego kontrastu
+    ctx.lineWidth = 35;
+    ctx.lineCap = 'round';
     
-    const barCount = 6;
+    const barCount = 7;
     const barSpacing = width / (barCount + 1);
     
     for (let i = 1; i <= barCount; i++) {
@@ -283,29 +284,31 @@ export async function generatePrisonerCard(avatarUrl: string): Promise<Buffer> {
         ctx.stroke();
     }
 
-    // Poziome belki
+    // Poziome belki wzmacniające
+    ctx.lineWidth = 25;
     ctx.beginPath();
-    ctx.moveTo(0, height * 0.3);
-    ctx.lineTo(width, height * 0.3);
+    ctx.moveTo(0, height * 0.25);
+    ctx.lineTo(width, height * 0.25);
     ctx.stroke();
     
     ctx.beginPath();
-    ctx.moveTo(0, height * 0.7);
-    ctx.lineTo(width, height * 0.7);
+    ctx.moveTo(0, height * 0.75);
+    ctx.lineTo(width, height * 0.75);
     ctx.stroke();
 
-    // 3. STEMPEL "OSADZONY"
+    // 3. STEMPEL "OSADZONY" (Bardziej wyrazisty)
     ctx.save();
     ctx.translate(width / 2, height / 2);
-    ctx.rotate(-0.15);
-    ctx.globalAlpha = 0.9;
-    ctx.strokeStyle = '#e74c3c';
-    ctx.lineWidth = 12;
+    ctx.rotate(-0.2);
+    ctx.globalAlpha = 1.0;
+    ctx.strokeStyle = '#ff0000';
+    ctx.lineWidth = 15;
     
-    ctx.strokeRect(-250, -80, 500, 160);
+    // Grubsza ramka stempla
+    ctx.strokeRect(-280, -90, 560, 180);
 
-    ctx.fillStyle = '#e74c3c';
-    ctx.font = 'bold 90px Roboto';
+    ctx.fillStyle = '#ff0000';
+    ctx.font = 'bold 100px Roboto';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('OSADZONY', 0, 0);

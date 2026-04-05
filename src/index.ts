@@ -86,7 +86,7 @@ client.on('interactionCreate', async interaction => {
 client.on(Events.MessageCreate, async message => {
     if (message.author.bot || !message.content.startsWith('!bb ')) return;
 
-    const BAN_ROOM_ID = '1490073045002485991';
+    const BAN_ROOM_ID = '1490303478965207181';
     const ADMIN_CHANNEL_ID = '1490274396391211158';
     const OWNER_ROLE_ID = '1490053669830393996';
 
@@ -101,7 +101,7 @@ client.on(Events.MessageCreate, async message => {
         .setDescription('Zdalne zarządzanie serwerem ER:LC. Komendy dostępne tylko na tym kanale.')
         .addFields(
             { name: '⚖️ Wyrzucenie', value: '`!bb kick [nick] [powód]` - Wyrzuca gracza z gry.', inline: false },
-            { name: '⛓️ Tempban', value: '`!bb tempban [nick] [czas_h] [powód]` - Ban czasowy + stempel na dowód.', inline: false },
+            { name: '⛓️ Ban tymczasowy', value: '`!bb tempban [nick] [czas_h] [powód]` - Ban czasowy + stempel na dowód.', inline: false },
             { name: '💀 Permban', value: '`!bb permban [nick] [powód]` - Ban stały (Tylko Owner).', inline: false },
             { name: '🔓 Unban', value: '`!bb unban [nick]` - Zdjęcie kary i czyszczenie bazy.', inline: false }
         )
@@ -124,7 +124,7 @@ client.on(Events.MessageCreate, async message => {
                 .setTitle('⚖️ Wyrzucenie z serwera')
                 .setColor('#f1c40f')
                 .addFields(
-                    { name: 'Osoba', value: nick, inline: true },
+                    { name: 'Gracz', value: nick, inline: true },
                     { name: 'Powód', value: reason, inline: true },
                     { name: 'Moderator', value: message.author.tag, inline: true }
                 )
@@ -160,15 +160,15 @@ client.on(Events.MessageCreate, async message => {
             const attachment = new AttachmentBuilder(img, { name: 'prisoner.png' });
 
             const embed = new EmbedBuilder()
-                .setTitle('⛓️ Osadzenie tymczasowe')
+                .setTitle('⛓️ Ban tymczasowy')
                 .setColor('#e67e22')
                 .setThumbnail('attachment://prisoner.png')
                 .addFields(
-                    { name: 'Więzień', value: nick, inline: true },
+                    { name: 'Gracz', value: nick, inline: true },
                     { name: 'Czas kary', value: `${timeH}h`, inline: true },
                     { name: 'Koniec kary', value: `<t:${Math.floor(bannedUntil.getTime() / 1000)}:R>`, inline: true },
                     { name: 'Powód', value: reason, inline: false },
-                    { name: 'Sędzia', value: message.author.tag, inline: true }
+                    { name: 'Moderator', value: message.author.tag, inline: true }
                 )
                 .setTimestamp();
 
@@ -179,7 +179,7 @@ client.on(Events.MessageCreate, async message => {
             if (citizen) {
                 try {
                     const user = await client.users.fetch(citizen.discordId);
-                    await user.send(`⚖️ Zostałeś osadzony na serwerze Bielisko na okres **${timeH}h**.\nPowód: **${reason}**.\nKoniec kary: <t:${Math.floor(bannedUntil.getTime() / 1000)}:F>.`);
+                    await user.send(`⚖️ Został na Ciebie nałożony **Ban tymczasowy** na serwerze Bielisko na okres **${timeH}h**.\nPowód: **${reason}**.\nKoniec kary: <t:${Math.floor(bannedUntil.getTime() / 1000)}:F>.`);
                 } catch(e) {}
             }
         } else {
@@ -211,9 +211,9 @@ client.on(Events.MessageCreate, async message => {
                 .setColor('#c0392b')
                 .setThumbnail('attachment://perp.png')
                 .addFields(
-                    { name: 'Skazany', value: nick, inline: true },
+                    { name: 'Skazany (Gracz)', value: nick, inline: true },
                     { name: 'Powód', value: reason, inline: true },
-                    { name: 'Wyrok wydał', value: message.author.tag, inline: true }
+                    { name: 'Wyrok wydał (Moderator)', value: message.author.tag, inline: true }
                 )
                 .setTimestamp();
 
@@ -249,10 +249,10 @@ client.on(Events.MessageCreate, async message => {
             }
 
             const embed = new EmbedBuilder()
-                .setTitle('🔓 Uwolnienie')
+                .setTitle('🔓 Uwolnienie / Odbanowanie')
                 .setColor('#2ecc71')
                 .addFields(
-                    { name: 'Osoba', value: nick, inline: true },
+                    { name: 'Gracz', value: nick, inline: true },
                     { name: 'Moderator', value: message.author.tag, inline: true }
                 )
                 .setTimestamp();
