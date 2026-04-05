@@ -20,108 +20,194 @@ export async function generateIDCard(data: CitizenData, avatarUrl: string): Prom
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
 
-    // Tło (delikatne pastelowe przejście przypominające dokument)
-    const gradient = ctx.createLinearGradient(0, 0, width, height);
-    gradient.addColorStop(0, '#e8f4f8');
-    gradient.addColorStop(0.5, '#f5ebeb');
-    gradient.addColorStop(1, '#e8f4f8');
-    ctx.fillStyle = gradient;
+    // 1. TŁO - Nowoczesny e-dowód (Srebrzysto-niebieski)
+    const baseGrad = ctx.createLinearGradient(0, 0, width, height);
+    baseGrad.addColorStop(0, '#f0f2f5');
+    baseGrad.addColorStop(0.3, '#ddecff');
+    baseGrad.addColorStop(0.7, '#fff1f1'); // Subtelny różowy akcent
+    baseGrad.addColorStop(1, '#e2e8f0');
+    ctx.fillStyle = baseGrad;
     ctx.fillRect(0, 0, width, height);
 
-    // Ozdobnik na górze (biało-czerwony)
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, width, 15);
-    ctx.fillStyle = '#dc143c';   // karmazyn polskiej flagi
-    ctx.fillRect(0, 15, width, 15);
-
-    // Nagłówek dokumentu
-    ctx.fillStyle = '#333333';
-    ctx.font = '24px RobotoBold';
-    ctx.fillText('RZECZPOSPOLITA POLSKA', 300, 70);
-    ctx.font = '18px Roboto';
-    ctx.fillStyle = '#555555';
-    ctx.fillText('DOWÓD OSOBISTY / IDENTITY CARD', 300, 95);
-
-    // Rysowanie awatara postaci
-    try {
-        const avatar = await loadImage(avatarUrl);
-        const imgWidth = 220;
-        const imgHeight = 220;
-        const imgX = 40;
-        const imgY = 120;
-        
-        ctx.save();
+    // 2. PROCEDURALNY GILOSZ (Wzór zabezpieczający)
+    ctx.strokeStyle = 'rgba(0, 51, 153, 0.04)';
+    ctx.lineWidth = 0.5;
+    for (let i = -100; i < width + 100; i += 15) {
         ctx.beginPath();
-        ctx.roundRect(imgX, imgY, imgWidth, imgHeight, 15);
-        ctx.clip();
-        
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(imgX, imgY, imgWidth, imgHeight); // tło obrazka
-        ctx.drawImage(avatar, imgX, imgY, imgWidth, imgHeight);
-        ctx.restore();
-        
-        // Obramowanie
-        ctx.strokeStyle = '#cccccc';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.roundRect(imgX, imgY, imgWidth, imgHeight, 15);
+        for (let j = 0; j < height; j += 10) {
+            const x = i + Math.sin(j * 0.015) * 40;
+            ctx.lineTo(x, j);
+        }
         ctx.stroke();
-
-    } catch (e) {
-        console.error('Error drawing avatar', e);
-        ctx.fillStyle = '#cccccc';
-        ctx.fillRect(40, 120, 220, 220);
     }
 
-    // Dynamiczne Pola Danych
-    const startX = 300;
-    const startY = 145;
-    const lineHeight = 55;
+    // 3. PASEK UNIJNY (Top Left)
+    const blueBarWidth = 140;
+    const blueBarHeight = 90;
+    ctx.fillStyle = '#003399';
+    // Rysowanie prostokąta z jednym zaokrąglonym rogiem (dolny prawy)
+    ctx.beginPath();
+    ctx.roundRect(0, 0, blueBarWidth, blueBarHeight, [0, 0, 30, 0]);
+    ctx.fill();
 
-    const drawField = (label: string, value: string, x: number, y: number) => {
-        ctx.fillStyle = '#888888';
-        ctx.font = '12px Roboto';
+    // Gwiazdy i PL
+    ctx.save();
+    ctx.translate(70, 45);
+    ctx.strokeStyle = '#FFCC00';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 12; i++) {
+        ctx.save();
+        ctx.rotate((Math.PI * 2 / 12) * i);
+        ctx.beginPath();
+        ctx.moveTo(0, -22);
+        ctx.lineTo(0, -26);
+        ctx.stroke();
+        ctx.restore();
+    }
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '28px RobotoBold';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('PL', 0, 0);
+    ctx.restore();
+
+    // NAGŁÓWEK
+    ctx.fillStyle = '#003399';
+    ctx.font = '32px RobotoBold';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText('RZECZPOSPOLITA POLSKA', 160, 45);
+    ctx.font = '16px RobotoBold';
+    ctx.fillStyle = '#64748b';
+    ctx.fillText('REPUBLIC OF POLAND', 160, 70);
+    ctx.font = '18px Roboto';
+    ctx.fillStyle = '#334155';
+    ctx.fillText('DOWÓD OSOBISTY / IDENTITY CARD', 160, 100);
+
+    // 4. CHIP ELEKTRONICZNY
+    const chipX = 320;
+    const chipY = 120;
+    const chipGrad = ctx.createLinearGradient(chipX, chipY, chipX + 65, chipY + 50);
+    chipGrad.addColorStop(0, '#d4af37');
+    chipGrad.addColorStop(0.5, '#f7e4a1');
+    chipGrad.addColorStop(1, '#b8860b');
+    
+    ctx.fillStyle = chipGrad;
+    ctx.beginPath();
+    ctx.roundRect(chipX, chipY, 65, 50, 8);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    
+    // Wzór na chipie
+    ctx.beginPath();
+    ctx.moveTo(chipX + 32, chipY); ctx.lineTo(chipX + 32, chipY + 50);
+    ctx.moveTo(chipX, chipY + 25); ctx.lineTo(chipX + 65, chipY + 25);
+    ctx.stroke();
+
+    // 5. ZDJĘCIE OBYWATELA
+    try {
+        const avatar = await loadImage(avatarUrl);
+        const imgWidth = 240;
+        const imgHeight = 240;
+        const imgX = 40;
+        const imgY = 130;
+
+        // Cień pod zdjęciem
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.15)';
+        ctx.shadowBlur = 20;
+        ctx.shadowOffsetX = 5;
+        ctx.shadowOffsetY = 8;
+
+        ctx.beginPath();
+        ctx.roundRect(imgX, imgY, imgWidth, imgHeight, 25);
+        ctx.fill();
+        ctx.restore();
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(imgX, imgY, imgWidth, imgHeight, 25);
+        ctx.clip();
+        
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(imgX, imgY, imgWidth, imgHeight);
+        ctx.drawImage(avatar, imgX, imgY, imgWidth, imgHeight);
+        ctx.restore();
+
+        // Ramka wokół zdjęcia
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.roundRect(imgX, imgY, imgWidth, imgHeight, 25);
+        ctx.stroke();
+    } catch (e) {
+        ctx.fillStyle = '#cbd5e1';
+        ctx.roundRect(40, 130, 240, 240, 25);
+        ctx.fill();
+    }
+
+    // 6. DANE OBYWATELA
+    const dataX = 330;
+    const dataY = 210;
+    const spacing = 70;
+
+    const drawModernField = (label: string, value: string, x: number, y: number) => {
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '10px Roboto';
         ctx.fillText(label.toUpperCase(), x, y);
         
-        ctx.fillStyle = '#111111';
+        ctx.fillStyle = '#0f172a';
         ctx.font = '22px RobotoBold';
-        ctx.fillText(value.toUpperCase(), x, y + 25);
+        ctx.fillText(value.toUpperCase(), x, y + 26);
     };
 
-    drawField('Nazwisko / Surname', data.lastName, startX, startY);
-    drawField('Imię (Imiona) / Name', data.firstName, startX, startY + lineHeight);
-    drawField('Obywatelstwo / Nationality', data.citizenship, startX, startY + lineHeight * 2);
+    drawModernField('Nazwisko / Surname', data.lastName, dataX, dataY);
+    drawModernField('Imię (Imiona) / Name', data.firstName, dataX, dataY + spacing);
+    drawModernField('Obywatelstwo / Nationality', data.citizenship, dataX, dataY + spacing * 2);
     
-    drawField('Data urodzenia / Date of birth', data.dob, startX, startY + lineHeight * 3);
-    drawField('Płeć / Sex', data.gender, startX + 280, startY + lineHeight * 3);
+    drawModernField('Data urodzenia / Birth', data.dob, dataX, dataY + spacing * 3);
+    drawModernField('Płeć / Sex', data.gender, dataX + 270, dataY + spacing * 3);
     
-    // Numer obywatela
-    drawField('Numer Obywatela / Citizen No.', data.citizenNumber, startX, startY + lineHeight * 4);
+    // Numer seryjny (Citizen No) w dolnym rogu
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '9px RobotoBold';
+    ctx.fillText('NUMER OBYWATELA / CITIZEN NUMBER', width - 40, height - 130);
+    ctx.fillStyle = '#334155';
+    ctx.font = '18px SpaceMono';
+    ctx.fillText(data.citizenNumber.toUpperCase(), width - 40, height - 105);
+    ctx.textAlign = 'left';
 
-    // Strefa Maszynowa (MRZ - Machine Readable Zone)
-    const mrzY = 440;
-    ctx.fillStyle = '#eeeeee';
-    ctx.fillRect(0, mrzY, width, height - mrzY);
+    // 7. HOLOGRAM (Subtelny orzeł w tle)
+    ctx.save();
+    ctx.globalAlpha = 0.05;
+    ctx.fillStyle = '#003399';
+    ctx.translate(width - 180, height / 2);
+    ctx.beginPath();
+    ctx.arc(0, 0, 140, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
 
-    ctx.fillStyle = '#000000';
-    ctx.font = '24px SpaceMono';
-    
-    // Normalizowanie polskich liter i czyszczenie znaków dla MRZ
-    const cleanStr = (str: string) => str.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/[^A-Z]/gi, '').toUpperCase();
-    
-    const sName = cleanStr(data.lastName);
-    const fName = cleanStr(data.firstName);
-    
-    const mrz1 = `IDPOL${sName}<<${fName}`;
-    const mrz1Pad = mrz1.padEnd(30, '<').substring(0, 30);
-    
-    // Szybka data urodzenia dla MRZ z usunięciem kropek
-    const dobMrz = data.dob.replace(/\\./g, '');
-    const mrz2 = `${data.citizenNumber}<0POL${dobMrz}${cleanStr(data.gender).substring(0,1)}<`;
-    const mrz2Pad = mrz2.padEnd(30, '<').substring(0, 30);
+    // 8. MRZ (Machine Readable Zone)
+    const mrzY = height - 90;
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.fillRect(0, mrzY, width, 90);
 
-    ctx.fillText(`${mrz1Pad}<<<<`, 40, mrzY + 45);
-    ctx.fillText(`${mrz2Pad}<<<<`, 40, mrzY + 80);
+    ctx.fillStyle = '#1e293b';
+    ctx.font = '22px SpaceMono';
+    
+    const cleanStr = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z]/gi, '').toUpperCase();
+    const lName = cleanStr(data.lastName).padEnd(15, '<').substring(0, 15);
+    const fName = cleanStr(data.firstName).padEnd(14, '<').substring(0, 14);
+    const dobMrz = data.dob.replace(/\./g, '').substring(0, 6);
+    
+    const mrzLine1 = `IDPOL${lName}${fName}<<<<<<`;
+    const mrzLine2 = `${data.citizenNumber.substring(0,9)}<${dobMrz}${cleanStr(data.gender).substring(0,1)}<<<<<<<<<<<<<`;
+
+    ctx.fillText(mrzLine1, 60, mrzY + 40);
+    ctx.fillText(mrzLine2, 60, mrzY + 75);
 
     return canvas.toBuffer('image/png');
 }
