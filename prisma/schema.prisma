@@ -39,3 +39,11 @@ model PendingInvalidation {
   discordId String
   createdAt DateTime @default(now())
 }
+
+model Economy {
+  discordId String    @id
+  pocket    Int       @default(0)
+  bank      Int       @default(0)
+  lastJob   DateTime?
+  lastExtra DateTime?
+}
