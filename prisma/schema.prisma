@@ -1,0 +1,22 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Citizen {
+  discordId     String   @id
+  robloxNick    String
+  robloxId      String
+  firstName     String
+  lastName      String
+  dob           String
+  gender        String
+  citizenship   String
+  citizenNumber String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}

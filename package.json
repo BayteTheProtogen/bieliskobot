@@ -1,0 +1,28 @@
+{
+  "name": "roblox-rp-discord-bot",
+  "version": "1.0.0",
+  "description": "Discord bot do generowania dowodów osobistych dla graczy Roblox",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.js",
+    "db:push": "prisma db push",
+    "db:generate": "prisma generate"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.65",
+    "@prisma/client": "^6.4.1",
+    "axios": "^1.8.1",
+    "discord.js": "^14.18.0",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.5",
+    "prisma": "^6.4.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
+  }
+}
