@@ -10,7 +10,7 @@ datasource db {
 model Citizen {
   discordId     String   @id
   robloxNick    String
-  robloxId      String
+  robloxId      String   @unique
   firstName     String
   lastName      String
   dob           String

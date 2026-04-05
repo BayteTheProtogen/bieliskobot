@@ -615,6 +615,12 @@ export async function handleInteractions(interaction: Interaction) {
 
             // Logika dla 'create'
             try {
+                // Sprawdź czy robloxId nie jest już zajęty
+                const duplicate = await prisma.citizen.findUnique({ where: { robloxId: robloxId } });
+                if (duplicate && duplicate.discordId !== interaction.user.id) {
+                    return interaction.editReply({ content: `🚫 To konto Roblox jest już przypisane do innego obywatela (<@${duplicate.discordId}>)! Jeden profil Roblox może mieć tylko jeden dowód.` });
+                }
+
                 // Zapisz do bazy
                 const citizenData = {
                     discordId: interaction.user.id,
