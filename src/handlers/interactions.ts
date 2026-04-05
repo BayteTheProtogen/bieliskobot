@@ -162,15 +162,24 @@ export async function handleInteractions(interaction: Interaction) {
                     });
                 }
 
-                // Zmiana pseudonimu
+                // Zmiana pseudonimu i nadawanie roli
                 try {
                     const robloxUser = await getUserInfo(robloxId);
-                    if (robloxUser && interaction.guild) {
+                    if (interaction.guild) {
                         const member = await interaction.guild.members.fetch(interaction.user.id);
-                        await member.setNickname(`${robloxUser.displayName} (@${robloxUser.name})`);
+                        
+                        // Nadanie roli Cywil
+                        const roleId = '1490075447629971467';
+                        if (!member.roles.cache.has(roleId)) {
+                            await member.roles.add(roleId);
+                        }
+
+                        if (robloxUser) {
+                            await member.setNickname(`${robloxUser.displayName} (@${robloxUser.name})`);
+                        }
                     }
                 } catch (e) {
-                    console.error('Błąd zmiany pseudonimu (brak uprawnień lub błąd API)', e);
+                    console.error('Błąd zmiany pseudonimu lub dodania roli (brak uprawnień lub błąd API)', e);
                 }
 
                 await interaction.editReply({ content: '✅ Dowód wyrobiony pomyślnie!' });
