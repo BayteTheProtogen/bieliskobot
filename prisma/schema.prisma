@@ -39,4 +39,3 @@ model PendingInvalidation {
   discordId String
   createdAt DateTime @default(now())
 }
-

@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
 import { prisma } from '../services/db';
 import { getUserIdByUsername, getAvatarBust } from '../services/roblox';
 import { generateIDCard } from '../services/canvas';
@@ -33,14 +33,8 @@ export const dowodCommand = {
         .addSubcommand(subcommand =>
             subcommand
                 .setName('uniewaznij')
-                .setDescription('Unieważnij dowód osobisty (wymaga zatwierdzenia przez urząd)')
-                .addStringOption(option =>
-                    option.setName('nick')
-                        .setDescription('Nick Roblox osoby, której dowód chcesz unieważnić (tylko dla Właściciela)')
-                        .setRequired(false)
-                )
+                .setDescription('Unieważnij swój obecny dowód osobisty (wymaga zatwierdzenia przez urząd)')
         ),
-
 
     async execute(interaction: ChatInputCommandInteraction) {
         const subcommand = interaction.options.getSubcommand();
@@ -146,62 +140,46 @@ export const dowodCommand = {
         }
 
         if (subcommand === 'uniewaznij') {
-            const isOwner = discordId === '1490053669830393996';
-            const targetNick = interaction.options.getString('nick');
-
-            if (isOwner && targetNick) {
-                // Owner unieważnia kogoś innego
-                const targetCitizen = await prisma.citizen.findFirst({ where: { robloxNick: targetNick } });
-                if (!targetCitizen) {
-                    return interaction.reply({ content: `🚫 Nie znaleziono obywatela o nicku Roblox: **${targetNick}**.`, ephemeral: true });
-                }
-
-                const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                    new ButtonBuilder()
-                        .setCustomId(`uniewaznij_owner_confirm|${targetCitizen.discordId}`)
-                        .setLabel(`✅ Potwierdzam unieważnienie dowodu: ${targetNick}`)
-                        .setStyle(ButtonStyle.Danger),
-                    new ButtonBuilder()
-                        .setCustomId('uniewaznij_cancel')
-                        .setLabel('Anuluj')
-                        .setStyle(ButtonStyle.Secondary)
-                );
-
-                return interaction.reply({
-                    content: `⚠️ Czy na pewno chcesz **natychmiastowo** unieważnić dowód obywatela **${targetCitizen.firstName} ${targetCitizen.lastName}** (@${targetNick})?`,
-                    components: [row],
-                    ephemeral: true
-                });
+            const ownerId = '1490053669830393996';
+            if (interaction.user.id === ownerId) {
+                // Owner flow - Show Modal
+                const modal = new ModalBuilder()
+                    .setCustomId('admin_uniewaznij_modal')
+                    .setTitle('Administracyjne unieważnienie');
+                const nickInput = new TextInputBuilder()
+                    .setCustomId('targetNick')
+                    .setLabel("Nick Roblox gracza do unieważnienia")
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true);
+                const row = new ActionRowBuilder<TextInputBuilder>().addComponents(nickInput);
+                modal.addComponents(row);
+                await interaction.showModal(modal);
             } else {
-                // Gracz unieważnia swój dowód
+                // User flow - Check if has ID
                 const citizen = await prisma.citizen.findUnique({ where: { discordId } });
                 if (!citizen) {
-                    return interaction.reply({ content: '🚫 Nie posiadasz wyrobionego dowodu osobistego, który mógłbyś unieważnić.', ephemeral: true });
+                    return interaction.reply({ content: '🚫 Nie posiadasz wyrobionego dowodu osobistego, więc nie możesz go unieważnić!', ephemeral: true });
                 }
 
+                // Check if already pending
                 const pending = await prisma.pendingInvalidation.findFirst({ where: { discordId } });
                 if (pending) {
-                    return interaction.reply({ content: '🚫 Twoja prośba o unieważnienie dowodu jest już w trakcie rozpatrywania przez Urząd.', ephemeral: true });
+                    return interaction.reply({ content: '🚫 Twoje podanie o unieważnienie dowodu jest już procesowane w Urzędzie!', ephemeral: true });
                 }
 
                 const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
                     new ButtonBuilder()
-                        .setCustomId('uniewaznij_user_confirm')
-                        .setLabel('✅ Potwierdzam chęć unieważnienia')
-                        .setStyle(ButtonStyle.Danger),
-                    new ButtonBuilder()
-                        .setCustomId('uniewaznij_cancel')
-                        .setLabel('Anuluj')
-                        .setStyle(ButtonStyle.Secondary)
+                        .setCustomId('user_confirm_unieważnienie')
+                        .setLabel('⚠️ Potwierdzam chęć unieważnienia')
+                        .setStyle(ButtonStyle.Danger)
                 );
 
-                return interaction.reply({
-                    content: `❗ Czy na pewno chcesz złożyć podanie o **unieważnienie** swojego dowodu osobistego? Po zatwierdzeniu przez Urząd stracisz status Obywatela.`,
+                await interaction.reply({
+                    content: '### ⚠️ Czy na pewno chcesz unieważnić swój dowód?\nTa operacja spowoduje wysłanie wniosku do Urzędu. Po jego zatwierdzeniu stracisz dostęp do obecnej tożsamości i będziesz musiał wyrabiać nowy dowód.',
                     components: [row],
                     ephemeral: true
                 });
             }
         }
-
     }
 };
