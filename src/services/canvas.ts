@@ -1,4 +1,9 @@
-import { createCanvas, loadImage } from '@napi-rs/canvas';
+import { GlobalFonts, createCanvas, loadImage } from '@napi-rs/canvas';
+import { join } from 'path';
+
+GlobalFonts.registerFromPath(join(__dirname, '../../fonts/Roboto-Regular.ttf'), 'Roboto');
+GlobalFonts.registerFromPath(join(__dirname, '../../fonts/Roboto-Bold.ttf'), 'RobotoBold');
+GlobalFonts.registerFromPath(join(__dirname, '../../fonts/SpaceMono-Bold.ttf'), 'SpaceMono');
 
 export interface CitizenData {
     firstName: string;
@@ -31,9 +36,9 @@ export async function generateIDCard(data: CitizenData, avatarUrl: string): Prom
 
     // Nagłówek dokumentu
     ctx.fillStyle = '#333333';
-    ctx.font = 'bold 24px sans-serif';
+    ctx.font = '24px RobotoBold';
     ctx.fillText('RZECZPOSPOLITA POLSKA', 300, 70);
-    ctx.font = '18px sans-serif';
+    ctx.font = '18px Roboto';
     ctx.fillStyle = '#555555';
     ctx.fillText('DOWÓD OSOBISTY / IDENTITY CARD', 300, 95);
 
@@ -75,11 +80,11 @@ export async function generateIDCard(data: CitizenData, avatarUrl: string): Prom
 
     const drawField = (label: string, value: string, x: number, y: number) => {
         ctx.fillStyle = '#888888';
-        ctx.font = '12px sans-serif';
+        ctx.font = '12px Roboto';
         ctx.fillText(label.toUpperCase(), x, y);
         
         ctx.fillStyle = '#111111';
-        ctx.font = 'bold 22px sans-serif';
+        ctx.font = '22px RobotoBold';
         ctx.fillText(value.toUpperCase(), x, y + 25);
     };
 
@@ -99,7 +104,7 @@ export async function generateIDCard(data: CitizenData, avatarUrl: string): Prom
     ctx.fillRect(0, mrzY, width, height - mrzY);
 
     ctx.fillStyle = '#000000';
-    ctx.font = 'bold 24px monospace';
+    ctx.font = '24px SpaceMono';
     
     // Normalizowanie polskich liter i czyszczenie znaków dla MRZ
     const cleanStr = (str: string) => str.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/[^A-Z]/gi, '').toUpperCase();
