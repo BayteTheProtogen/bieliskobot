@@ -2,6 +2,7 @@ import { Client, GatewayIntentBits, REST, Routes, Events } from 'discord.js';
 import * as dotenv from 'dotenv';
 import { dowodCommand } from './commands/dowod';
 import { economyCommands, workCommands, extraWorkCommands } from './commands/economy';
+import { economyAdminCommands } from './commands/economyAdmin';
 import { mandatCommand } from './commands/mandat';
 import { handleInteractions } from './handlers/interactions';
 
@@ -36,7 +37,8 @@ client.once(Events.ClientReady, async () => {
                 economyCommands.data.toJSON(),
                 workCommands.data.toJSON(),
                 extraWorkCommands.data.toJSON(),
-                mandatCommand.data.toJSON()
+                mandatCommand.data.toJSON(),
+                economyAdminCommands.data.toJSON()
             ] },
         );
         console.log('Successfully reloaded application (/) commands.');
@@ -68,6 +70,8 @@ client.on('interactionCreate', async interaction => {
                 return;
             }
             await mandatCommand.execute(interaction);
+        } else if (interaction.commandName === 'eco-admin') {
+            await economyAdminCommands.execute(interaction);
         }
     } else {
         await handleInteractions(interaction);
