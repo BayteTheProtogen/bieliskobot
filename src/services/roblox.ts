@@ -30,3 +30,19 @@ export async function getAvatarBust(userId: string): Promise<string | null> {
         return null;
     }
 }
+
+export async function getUserInfo(userId: string): Promise<{ name: string, displayName: string } | null> {
+    try {
+        const response = await axios.get(`https://users.roblox.com/v1/users/${userId}`);
+        if (response.data) {
+            return {
+                name: response.data.name,
+                displayName: response.data.displayName
+            };
+        }
+        return null;
+    } catch (e) {
+        console.error('Error fetching Roblox User Info:', e);
+        return null;
+    }
+}

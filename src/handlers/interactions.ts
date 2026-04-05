@@ -1,7 +1,7 @@
 import { Interaction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, AttachmentBuilder } from 'discord.js';
 import { prisma } from '../services/db';
 import { generateIDCard } from '../services/canvas';
-import { getAvatarBust } from '../services/roblox';
+import { getAvatarBust, getUserInfo } from '../services/roblox';
 
 export async function handleInteractions(interaction: Interaction) {
     if (interaction.isButton()) {
@@ -142,6 +142,17 @@ export async function handleInteractions(interaction: Interaction) {
                         content: `🪪 Obywatel **${firstName} ${lastName}** (Z postacią **${robloxNick}**) wyrobił dowód osobisty!` + (!dmSent ? `\n*(Nie udało się wysłać na DM)*` : ''),
                         files: [attachment]
                     });
+                }
+
+                // Zmiana pseudonimu
+                try {
+                    const robloxUser = await getUserInfo(robloxId);
+                    if (robloxUser && interaction.guild) {
+                        const member = await interaction.guild.members.fetch(interaction.user.id);
+                        await member.setNickname(`${robloxUser.displayName} (@${robloxUser.name})`);
+                    }
+                } catch (e) {
+                    console.error('Błąd zmiany pseudonimu (brak uprawnień lub błąd API)', e);
                 }
 
                 await interaction.editReply({ content: '✅ Dowód wyrobiony pomyślnie!' });
