@@ -51,12 +51,14 @@ client.on('interactionCreate', async interaction => {
                 return;
             }
             await dowodCommand.execute(interaction);
-        } else if (interaction.commandName === 'portfel') {
-            await economyCommands.execute(interaction);
-        } else if (interaction.commandName === 'praca') {
-            await workCommands.execute(interaction);
-        } else if (interaction.commandName === 'dorobka') {
-            await extraWorkCommands.execute(interaction);
+        } else if (['portfel', 'praca', 'dorobka'].includes(interaction.commandName)) {
+            if (interaction.channelId !== '1490011312669855904') {
+                await interaction.reply({ content: '🚫 Zarządzanie finansami i praca są dozwolone wyłącznie na kanale <#1490011312669855904>!', ephemeral: true });
+                return;
+            }
+            if (interaction.commandName === 'portfel') await economyCommands.execute(interaction);
+            if (interaction.commandName === 'praca') await workCommands.execute(interaction);
+            if (interaction.commandName === 'dorobka') await extraWorkCommands.execute(interaction);
         }
     } else {
         await handleInteractions(interaction);
