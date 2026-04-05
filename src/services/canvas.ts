@@ -229,110 +229,192 @@ export async function generateFineCard(data: FineData): Promise<Buffer> {
     const ctx = canvas.getContext('2d');
 
     const isWarning = data.amount === 0;
-    const primaryColor = isWarning ? '#f1c40f' : '#e74c3c'; // Yellow or Red
-    const secondaryColor = isWarning ? '#f39c12' : '#c0392b';
+    const primaryColor = isWarning ? '#D4AF37' : '#C0392B'; // Gold or Deep Red
+    const secondaryColor = isWarning ? '#F1C40F' : '#922B21';
 
-    // Background
-    ctx.fillStyle = '#f8f9fa';
+    // 1. TŁO - Delikatny gilosz
+    ctx.fillStyle = '#fdfdfd';
     ctx.fillRect(0, 0, width, height);
 
-    // Decorative Borders
-    ctx.strokeStyle = primaryColor;
-    ctx.lineWidth = 20;
-    ctx.strokeRect(0, 0, width, height);
+    ctx.strokeStyle = `rgba(${isWarning ? '212, 175, 55' : '192, 57, 43'}, 0.05)`;
+    ctx.lineWidth = 0.5;
+    for (let i = -100; i < width + 100; i += 15) {
+        ctx.beginPath();
+        for (let j = 0; j < height; j += 10) {
+            const x = i + Math.cos(j * 0.02) * 20;
+            ctx.lineTo(x, j);
+        }
+        ctx.stroke();
+    }
 
-    // Header
-    const headerHeight = 120;
-    const grad = ctx.createLinearGradient(0, 0, width, headerHeight);
-    grad.addColorStop(0, primaryColor);
-    grad.addColorStop(1, secondaryColor);
-    ctx.fillStyle = grad;
-    ctx.fillRect(10, 10, width - 20, headerHeight);
+    // 2. NAGŁÓWEK - Metaliczny gradient
+    const headerH = 140;
+    const headerGrad = ctx.createLinearGradient(0, 0, 0, headerH);
+    headerGrad.addColorStop(0, primaryColor);
+    headerGrad.addColorStop(0.5, secondaryColor);
+    headerGrad.addColorStop(1, primaryColor);
+    
+    ctx.fillStyle = headerGrad;
+    ctx.beginPath();
+    ctx.roundRect(0, 0, width, headerH, [0, 0, 40, 40]);
+    ctx.fill();
+
+    // Połysk na nagłówku
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(width, 0);
+    ctx.lineTo(width, 40);
+    ctx.lineTo(0, 100);
+    ctx.fill();
 
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 42px Roboto';
+    ctx.font = 'bold 44px Roboto';
     ctx.textAlign = 'center';
-    ctx.fillText(isWarning ? 'POUCZENIE' : 'MANDAT KARNY', width / 2, 70);
+    ctx.shadowColor = 'rgba(0,0,0,0.3)';
+    ctx.shadowBlur = 10;
+    ctx.fillText(isWarning ? 'POUCZENIE' : 'MANDAT KARNY', width / 2, 75);
     
-    ctx.font = '20px Roboto';
-    ctx.fillText('RP BIELISKO - SŁUŻBY PORZĄDKOWE', width / 2, 105);
+    ctx.shadowBlur = 0;
+    ctx.font = 'bold 16px Roboto';
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.fillText('RZECZPOSPOLITA POLSKA - SŁUŻBY PORZĄDKOWE', width / 2, 110);
 
-    // Content Area
-    const contentX = 50;
-    let currentY = 200;
+    // 3. SEKCJA DANYCH
+    const contentX = 60;
+    let currentY = 210;
 
-    const drawLabelValue = (label: string, value: string) => {
-        ctx.textAlign = 'left';
-        ctx.fillStyle = '#7f8c8d';
-        ctx.font = 'bold 16px Roboto';
-        ctx.fillText(label.toUpperCase(), contentX, currentY);
-        
-        ctx.fillStyle = '#2c3e50';
-        ctx.font = '24px RobotoBold';
-        ctx.fillText(value, contentX, currentY + 35);
-        currentY += 80;
+    const drawLine = (y: number) => {
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.moveTo(contentX, y);
+        ctx.lineTo(width - contentX, y);
+        ctx.stroke();
+        ctx.setLineDash([]);
     };
 
-    drawLabelValue('Obywatel (Ukarany)', `${data.targetName} (@${data.targetNick})`);
-    drawLabelValue('Numer Dowodu', data.citizenNumber);
+    const drawSection = (label: string, value: string, subValue?: string) => {
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#64748b';
+        ctx.font = 'bold 12px Roboto';
+        ctx.fillText(label.toUpperCase(), contentX, currentY);
+        
+        ctx.fillStyle = '#1e293b';
+        ctx.font = '22px RobotoBold';
+        ctx.fillText(value.toUpperCase(), contentX, currentY + 30);
+        
+        if (subValue) {
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '14px Roboto';
+            ctx.fillText(`(${subValue})`, contentX, currentY + 52);
+            currentY += 10;
+        }
+        
+        currentY += 85;
+        drawLine(currentY - 35);
+    };
+
+    drawSection('Obywatel (Ukarany)', data.targetName, `@${data.targetNick}`);
+    drawSection('Numer Dowodu', data.citizenNumber);
     
-    // Reason with wrapping
-    ctx.fillStyle = '#7f8c8d';
-    ctx.font = 'bold 16px Roboto';
+    // Powód (z zawijaniem tekstu)
+    ctx.fillStyle = '#64748b';
+    ctx.font = 'bold 12px Roboto';
     ctx.fillText('POWÓD WYSTAWIENIA', contentX, currentY);
-    ctx.fillStyle = '#2c3e50';
-    ctx.font = '20px Roboto';
+    ctx.fillStyle = '#334155';
+    ctx.font = '18px Roboto';
     
     const words = data.reason.split(' ');
     let line = '';
-    const maxWidth = width - 100;
     let reasonY = currentY + 30;
-    
     for (const word of words) {
-        const testLine = line + word + ' ';
-        const metrics = ctx.measureText(testLine);
-        if (metrics.width > maxWidth && line !== '') {
+        const test = line + word + ' ';
+        if (ctx.measureText(test).width > width - 120) {
             ctx.fillText(line, contentX, reasonY);
             line = word + ' ';
-            reasonY += 25;
+            reasonY += 24;
         } else {
-            line = testLine;
+            line = test;
         }
     }
     ctx.fillText(line, contentX, reasonY);
-    currentY = reasonY + 60;
+    currentY = reasonY + 50;
+    drawLine(currentY - 15);
+    currentY += 35;
 
-    // Line separator
-    ctx.strokeStyle = '#dcdde1';
-    ctx.lineWidth = 1;
+    // Kwota - Grande
+    ctx.fillStyle = '#64748b';
+    ctx.font = 'bold 12px Roboto';
+    ctx.fillText('KWOTA GRZYWNY', contentX, currentY);
+    ctx.fillStyle = primaryColor;
+    ctx.font = 'bold 36px SpaceMono';
+    ctx.fillText(isWarning ? '0.00 ZŁ' : `${data.amount.toLocaleString()}.00 ZŁ`, contentX, currentY + 45);
+    currentY += 100;
+
+    // Funkcjonariusz i Data
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#64748b';
+    ctx.font = 'bold 10px Roboto';
+    ctx.fillText('WYSTAWIŁ:', contentX, currentY);
+    ctx.fillStyle = '#1e293b';
+    ctx.font = '14px RobotoBold';
+    ctx.fillText(data.officerName.toUpperCase(), contentX, currentY + 20);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#64748b';
+    ctx.font = 'bold 10px Roboto';
+    ctx.fillText('DATA I GODZINA:', width - contentX, currentY);
+    ctx.fillStyle = '#1e293b';
+    ctx.font = '14px RobotoBold';
+    ctx.fillText(data.date, width - contentX, currentY + 20);
+
+    // 4. PROCEDURALNA PIECZĘĆ
+    ctx.save();
+    ctx.translate(width - 140, height - 160);
+    ctx.rotate(-0.2);
+    ctx.globalAlpha = 0.7;
+    ctx.strokeStyle = primaryColor;
+    ctx.lineWidth = 3;
+    
+    // Zewnętrzny krąg
     ctx.beginPath();
-    ctx.moveTo(contentX, currentY - 30);
-    ctx.lineTo(width - contentX, currentY - 30);
+    ctx.arc(0, 0, 60, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    // Wewnętrzny krąg
+    ctx.beginPath();
+    ctx.arc(0, 0, 50, 0, Math.PI * 2);
     ctx.stroke();
 
-    drawLabelValue('Kwota Grzywny', isWarning ? '0 ZŁ (POUCZENIE)' : `${data.amount.toLocaleString()} ZŁ`);
-    drawLabelValue('Funkcjonariusz', data.officerName);
-    drawLabelValue('Data i Godzina', data.date);
-
-    // Footer / Stamp
-    ctx.save();
-    ctx.translate(width - 150, height - 150);
-    ctx.rotate(-Math.PI / 12);
-    ctx.strokeStyle = primaryColor;
-    ctx.lineWidth = 4;
-    ctx.strokeRect(-100, -40, 200, 80);
+    // Tekst pieczęci
     ctx.fillStyle = primaryColor;
-    ctx.font = 'bold 20px Roboto';
+    ctx.font = '10px RobotoBold';
     ctx.textAlign = 'center';
-    ctx.fillText('ZATWIERDZONO', 0, -5);
-    ctx.fillText('SYSTEM RP', 0, 20);
+    for (let i = 0; i < 8; i++) {
+        ctx.save();
+        ctx.rotate((Math.PI * 2 / 8) * i);
+        ctx.fillText('URZĄD RP', 0, -52);
+        ctx.restore();
+    }
+    
+    // Środek - Orzeł (proceduralnie-subtelny)
+    ctx.font = '24px RobotoBold';
+    ctx.fillText('RP', 0, 8);
     ctx.restore();
 
-    // Security Pattern (Bottom)
-    ctx.fillStyle = '#bdc3c7';
-    ctx.font = '10px SpaceMono';
+    // 5. MRZ (Machine Readable Zone)
+    ctx.fillStyle = 'rgba(0,0,0,0.03)';
+    ctx.fillRect(0, height - 70, width, 70);
+    
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '16px SpaceMono';
     ctx.textAlign = 'center';
-    ctx.fillText(`ID_FINE_${Date.now()}_${data.citizenNumber}`, width / 2, height - 30);
+    const fakeID = `FINE${Date.now().toString().substring(5)}<${data.citizenNumber}<<<<<<<<`;
+    const fakeID2 = `${data.targetNick.toUpperCase().padEnd(15, '<')}<<<<<<<<<<<<<<<<<<`;
+    ctx.fillText(fakeID, width / 2, height - 40);
+    ctx.fillText(fakeID2, width / 2, height - 15);
 
     return canvas.toBuffer('image/png');
 }
+
