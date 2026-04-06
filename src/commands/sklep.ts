@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 
 const ECONOMY_CHANNEL_ID = '1490011312669855904'; 
 
@@ -48,7 +48,22 @@ export const sklepCommands = {
             ]);
 
         const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
+        const components: any[] = [row];
 
-        await interaction.reply({ embeds: [embed], components: [row] });
+        const OWNER_ROLE_ID = '1490053669830393996';
+        const isOwner = interaction.user.id === OWNER_ROLE_ID || (interaction.member?.roles as any)?.cache.has(OWNER_ROLE_ID);
+
+        if (isOwner) {
+            const adminRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('shop_admin_tools')
+                    .setLabel('Narzędzia administracyjne')
+                    .setStyle(ButtonStyle.Danger)
+                    .setEmoji('⚙️')
+            );
+            components.push(adminRow);
+        }
+
+        await interaction.reply({ embeds: [embed], components: components });
     }
 };

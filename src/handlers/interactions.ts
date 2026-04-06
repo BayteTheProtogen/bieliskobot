@@ -110,6 +110,17 @@ export async function handleInteractions(interaction: Interaction) {
         if (interaction.isButton()) {
             const { customId } = interaction;
 
+            if (customId === 'shop_admin_tools') {
+                const OWNER_ROLE_ID = '1490053669830393996';
+                const isOwner = interaction.user.id === OWNER_ROLE_ID || (interaction.member?.roles as any)?.cache.has(OWNER_ROLE_ID);
+                
+                if (!isOwner) {
+                     return interaction.reply({ content: '🚫 Brak dostępu.', ephemeral: true });
+                }
+
+                return interaction.reply({ content: '🛠️ Menu narzędzi administracyjnych sklepu w przygotowaniu!', ephemeral: true });
+            }
+
             if (customId.startsWith('shop_buy|')) {
                 const itemId = customId.split('|')[1];
                 const item = getItemById(itemId);
