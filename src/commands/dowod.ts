@@ -191,7 +191,7 @@ export const dowodCommand = {
 
                 const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
                     new ButtonBuilder()
-                        .setCustomId('user_confirm_unieważnienie')
+                        .setCustomId('user_confirm_uniewaznij')
                         .setLabel('⚠️ Potwierdzam chęć unieważnienia')
                         .setStyle(ButtonStyle.Danger)
                 );

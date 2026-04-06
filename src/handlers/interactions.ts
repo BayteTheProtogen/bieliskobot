@@ -16,7 +16,7 @@ export async function handleInteractions(interaction: Interaction) {
 
             const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
                 new ButtonBuilder()
-                    .setCustomId(`owner_confirm_unieważnij|${targetDiscordId}`)
+                    .setCustomId(`owner_confirm_uniewaznij|${targetDiscordId}`)
                     .setLabel(`🔴 Potwierdzam: Unieważnij dowód ${citizen.firstName} ${citizen.lastName}`)
                     .setStyle(ButtonStyle.Danger)
             );
@@ -231,7 +231,7 @@ export async function handleInteractions(interaction: Interaction) {
             }
         }
 
-        if (customId === 'user_confirm_unieważnienie') {
+        if (customId === 'user_confirm_uniewaznij') {
             await interaction.deferUpdate();
             const discordId = interaction.user.id;
             const citizen = await prisma.citizen.findUnique({ where: { discordId } });
@@ -314,7 +314,7 @@ export async function handleInteractions(interaction: Interaction) {
             }
         }
 
-        if (customId.startsWith('owner_confirm_unieważnij|')) {
+        if (customId.startsWith('owner_confirm_uniewaznij|')) {
             const targetDiscordId = customId.split('|')[1];
             await interaction.deferUpdate();
             
@@ -444,7 +444,7 @@ export async function handleInteractions(interaction: Interaction) {
 
             const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
                 new ButtonBuilder()
-                    .setCustomId(`owner_confirm_unieważnij|${citizen.discordId}`)
+                    .setCustomId(`owner_confirm_uniewaznij|${citizen.discordId}`)
                     .setLabel(`🔴 Potwierdzam: Unieważnij dowód ${citizen.firstName} ${citizen.lastName}`)
                     .setStyle(ButtonStyle.Danger)
             );
