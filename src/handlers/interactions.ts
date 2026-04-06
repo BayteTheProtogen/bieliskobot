@@ -190,7 +190,8 @@ export async function handleInteractions(interaction: Interaction) {
 
             if (customId === 'shop_admin_tools') {
                 const OWNER_ROLE_ID = '1490053669830393996';
-                const isOwner = interaction.user.id === OWNER_ROLE_ID || (interaction.member?.roles as any)?.cache.has(OWNER_ROLE_ID);
+                const isOwner = interaction.user.id === OWNER_ROLE_ID || 
+                                (interaction.member?.roles && !Array.isArray(interaction.member.roles) && interaction.member.roles.cache.has(OWNER_ROLE_ID));
                 
                 if (!isOwner) {
                      return interaction.reply({ content: '🚫 Brak dostępu.', ephemeral: true });
@@ -709,7 +710,8 @@ export async function handleInteractions(interaction: Interaction) {
 
             if (customId.startsWith('delete_dm|')) {
                 const ADMIN_ID = '1490053669830393996';
-                const isOwner = interaction.user.id === ADMIN_ID || (interaction.member?.roles as any).cache.has(ADMIN_ID);
+                const isOwner = interaction.user.id === ADMIN_ID || 
+                                (interaction.member?.roles && !Array.isArray(interaction.member.roles) && interaction.member.roles.cache.has(ADMIN_ID));
                 
                 if (!isOwner) {
                     return interaction.reply({ content: '🚫 Brak uprawnień do usuwania DMów innych użytkowników.', flags: [MessageFlags.Ephemeral] });

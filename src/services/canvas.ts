@@ -530,3 +530,104 @@ export async function generateFineCard(data: FineData): Promise<Buffer> {
     return canvas.toBuffer('image/png');
 }
 
+export async function generateCasinoResult(user: any, isWin: boolean, outcomeLabel: string, newBalance: number): Promise<Buffer> {
+    const width = 600;
+    const height = 300;
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+
+    const baseColor = isWin ? '#064225' : '#4a0b12';
+    const darkColor = '#0a0a0a';
+    
+    const bgGrad = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, width);
+    bgGrad.addColorStop(0, baseColor);
+    bgGrad.addColorStop(1, darkColor);
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, width, height);
+    
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.font = '20px SpaceMono';
+    ctx.textAlign = 'center';
+    ctx.fillText('BIELISKO BET - RACHUNEK ROZLICZENIOWY', width / 2, 35);
+    
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.beginPath(); ctx.moveTo(50, 50); ctx.lineTo(width-50, 50); ctx.stroke();
+
+    const drawChip = (cx: number, cy: number, color1: string, color2: string, scale: number = 1, angle: number = 0) => {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(angle);
+        ctx.scale(scale, scale);
+
+        ctx.beginPath();
+        ctx.arc(0, 0, 40, 0, Math.PI * 2);
+        ctx.fillStyle = '#fdfdfd';
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#999';
+        ctx.stroke();
+
+        ctx.fillStyle = color2;
+        for (let i = 0; i < 8; i++) {
+            ctx.save();
+            ctx.rotate((Math.PI * 2 / 8) * i);
+            ctx.fillRect(25, -5, 15, 10);
+            ctx.restore();
+        }
+
+        ctx.beginPath();
+        ctx.arc(0, 0, 25, 0, Math.PI * 2);
+        ctx.fillStyle = color1;
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.arc(0, 0, 20, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 22px SpaceMono';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('$', 0, 0);
+
+        ctx.restore();
+    }
+
+    if (isWin) {
+        drawChip(120, 220, '#116e3c', '#000000', 1.2, 0);
+        drawChip(120, 205, '#116e3c', '#000000', 1.2, 0.1);
+        drawChip(120, 190, '#116e3c', '#000000', 1.2, -0.1);
+        drawChip(120, 175, '#116e3c', '#000000', 1.2, 0.2);
+        drawChip(160, 215, '#b8860b', '#000000', 1.1, -0.3);
+    } else {
+        ctx.save();
+        ctx.globalAlpha = 0.5;
+        drawChip(120, 150, '#9e1414', '#000', 1.2, -0.5);
+        drawChip(120, 170, '#9e1414', '#000', 1.2, -0.2);
+        ctx.globalAlpha = 1;
+        drawChip(120, 190, '#9e1414', '#000', 1.2, 0);
+        ctx.restore();
+    }
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = isWin ? '#2ecc71' : '#e74c3c';
+    ctx.font = 'bold 50px SpaceMono';
+    ctx.fillText(outcomeLabel, width - 60, 140);
+    
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = '22px Roboto';
+    ctx.fillText('NOWE SALDO KIESZENI:', width - 60, 190);
+    
+    ctx.fillStyle = '#f1c40f';
+    ctx.font = 'bold 36px SpaceMono';
+    ctx.fillText(`${newBalance.toLocaleString()} ZŁ`, width - 60, 230);
+
+    return canvas.toBuffer('image/png');
+}

@@ -7,7 +7,9 @@ import { mandatCommand } from './commands/mandat';
 import { sklepCommands } from './commands/sklep';
 import { ekwipunekCommands } from './commands/ekwipunek';
 import { logiCommand } from './commands/logi';
+import { kasynoCommand } from './commands/kasyno';
 import { handleInteractions } from './handlers/interactions';
+import { handleKasynoInteractions } from './handlers/kasynoInteractions';
 import { erlcModeration } from './services/erlc';
 import { generatePrisonerCard } from './services/canvas';
 import { prisma } from './services/db';
@@ -50,10 +52,11 @@ client.once(Events.ClientReady, async () => {
                 workCommands.data.toJSON(),
                 extraWorkCommands.data.toJSON(),
                 mandatCommand.data.toJSON(),
-                economyAdminCommands.data.toJSON(),
+                 economyAdminCommands.data.toJSON(),
                 sklepCommands.data.toJSON(),
                 ekwipunekCommands.data.toJSON(),
-                logiCommand.data.toJSON()
+                logiCommand.data.toJSON(),
+                kasynoCommand.data.toJSON()
             ] },
         );
         console.log('Successfully reloaded application (/) commands.');
@@ -73,9 +76,9 @@ client.on('interactionCreate', async interaction => {
                 return;
             }
             await dowodCommand.execute(interaction);
-        } else if (['portfel', 'praca', 'dorobka', 'sklep', 'ekwipunek'].includes(interaction.commandName)) {
+        } else if (['portfel', 'praca', 'dorobka', 'sklep', 'ekwipunek', 'kasyno'].includes(interaction.commandName)) {
             if (interaction.channelId !== '1490011312669855904') {
-                await interaction.reply({ content: '🚫 Komendy ekonomii, sklepu i pracy są dozwolone wyłącznie na kanale <#1490011312669855904>!', ephemeral: true });
+                await interaction.reply({ content: '🚫 Komendy ekonomii, sklepu, pracy oraz kasyna są dozwolone wyłącznie na kanale <#1490011312669855904>!', ephemeral: true });
                 return;
             }
             if (interaction.commandName === 'portfel') await economyCommands.execute(interaction);
@@ -83,6 +86,7 @@ client.on('interactionCreate', async interaction => {
             if (interaction.commandName === 'dorobka') await extraWorkCommands.execute(interaction);
             if (interaction.commandName === 'sklep') await sklepCommands.execute(interaction);
             if (interaction.commandName === 'ekwipunek') await ekwipunekCommands.execute(interaction);
+            if (interaction.commandName === 'kasyno') await kasynoCommand.execute(interaction);
         } else if (interaction.commandName === 'mandat') {
             if (interaction.channelId !== '1490365930818109490') {
                 await interaction.reply({ content: '🚫 Mandaty można wystawiać wyłącznie na kanale <#1490365930818109490>!', ephemeral: true });
@@ -150,7 +154,8 @@ client.on('interactionCreate', async interaction => {
                 }
             }
 
-            await finalizeAction(client, interaction.user, interaction.user.id, action, targetNick, reason, hours, isPermBan, 'game');
+            const erlcTsParsed = parseInt(erlcTimestamp, 10);
+            await finalizeAction(client, interaction.user, interaction.user.id, action, targetNick, reason, hours, isPermBan, 'game', isNaN(erlcTsParsed) ? undefined : erlcTsParsed);
             
             // Edit original DM message to show it's done
             if (interaction.message) {
@@ -165,8 +170,12 @@ client.on('interactionCreate', async interaction => {
         }
     }
     
-    // Any other interaction (including our specialized modals) falls through here
-    await handleInteractions(interaction);
+    // Check casino interactions first
+    const kasynoHandled = await handleKasynoInteractions(interaction);
+    if (!kasynoHandled) {
+        // Any other interaction (including our specialized modals) falls through here
+        await handleInteractions(interaction);
+    }
 });
 
 client.on(Events.MessageCreate, async message => {

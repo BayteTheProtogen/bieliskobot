@@ -21,12 +21,12 @@ async function pollOnce(client: Client) {
             if (!isModCmd) continue;
 
             const erlcTimestamp = log.Timestamp;
-            const existing = await (prisma as any).trackedAction.findUnique({
+            const existing = await prisma.trackedAction.findUnique({
                 where: { erlcTimestamp }
             });
             if (existing) continue;
 
-            await (prisma as any).trackedAction.create({
+            await prisma.trackedAction.create({
                 data: { erlcTimestamp }
             });
 

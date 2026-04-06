@@ -33,7 +33,8 @@ export async function finalizeAction(
     reason: string,
     hours: number | null,
     isPermBan: boolean,
-    source: 'game' | 'discord' = 'game'
+    source: 'game' | 'discord' = 'game',
+    erlcTimestamp?: number
 ) {
     // Safety check: if it's a ban but no hours and not perm, fallback to something visible
     let finalIsPermBan = isPermBan;
@@ -43,7 +44,9 @@ export async function finalizeAction(
         finalIsPermBan = true; // If no hours provided for a ban, treat as perm instead of showing nullh
     }
 
-    const bannedUntil = finalHours ? new Date(Date.now() + finalHours * 60 * 60 * 1000) : null;
+    // Calculate base time: if it's from game, use game timestamp, else current time
+    const baseTime = erlcTimestamp ? erlcTimestamp * 1000 : Date.now();
+    const bannedUntil = finalHours ? new Date(baseTime + finalHours * 60 * 60 * 1000) : null;
 
     // Update Citizen DB record
     const citizen = await prisma.citizen.findFirst({
@@ -52,12 +55,12 @@ export async function finalizeAction(
 
     if (citizen) {
         if (action === ':unban') {
-            await (prisma.citizen as any).update({
+            await prisma.citizen.update({
                 where: { discordId: citizen.discordId },
                 data: { isPermBanned: false, bannedUntil: null }
             });
         } else if (action !== ':kick') {
-            await (prisma.citizen as any).update({
+            await prisma.citizen.update({
                 where: { discordId: citizen.discordId },
                 data: { isPermBanned: finalIsPermBan, bannedUntil }
             });
@@ -94,14 +97,14 @@ export async function finalizeAction(
             ).setTimestamp();
         if (description) embed.setDescription(description);
 
-        const banLog = await (prisma as any).banLog.findFirst({
+        const banLog = await prisma.banLog.findFirst({
             where: { playerNick: { equals: targetNick, mode: 'insensitive' }, unbannedAt: null },
             orderBy: { createdAt: 'desc' }
         });
 
         if (banLog) {
             try {
-                const banMsg = await (banroom as any).messages.fetch(banLog.messageId).catch(() => null);
+                const banMsg = await banroom.messages.fetch(banLog.messageId).catch(() => null);
                 if (banMsg) {
                     const originalEmbed = banMsg.embeds[0];
                     const updatedEmbed = EmbedBuilder.from(originalEmbed)
@@ -109,17 +112,17 @@ export async function finalizeAction(
                         .setThumbnail(null)
                         .addFields({ name: '✅ ODBANOWANY', value: `<t:${Math.floor(Date.now() / 1000)}:R> • Moderator: ${user.tag}`, inline: false });
                     await banMsg.edit({ embeds: [updatedEmbed] });
-                    await (prisma as any).banLog.update({
+                    await prisma.banLog.update({
                         where: { id: banLog.id },
                         data: { unbannedAt: new Date(), unbanModDiscordId: modDiscordId }
                     });
                 }
-                await (banroom as any).send({ embeds: [embed] });
+                await banroom.send({ embeds: [embed] });
             } catch (e) {
-                await (banroom as any).send({ embeds: [embed] });
+                await banroom.send({ embeds: [embed] });
             }
         } else {
-            await (banroom as any).send({ embeds: [embed] });
+            await banroom.send({ embeds: [embed] });
         }
 
     } else {
@@ -139,7 +142,7 @@ export async function finalizeAction(
                 .addFields(
                     { name: 'Gracz', value: targetNick, inline: true },
                     { name: 'Czas kary', value: `${finalHours}h`, inline: true },
-                    { name: 'Koniec kary', value: bannedUntil ? `<t:${Math.floor(bannedUntil.getTime() / 1000)}:R>` : '—', inline: true },
+                    { name: 'Koniec kary', value: bannedUntil ? `<t:${Math.floor(bannedUntil.getTime() / 1000)}:f> (<t:${Math.floor(bannedUntil.getTime() / 1000)}:R>)` : '—', inline: false },
                     { name: 'Powód', value: reason, inline: false },
                     { name: 'Moderator', value: user.tag, inline: true },
                 ).setTimestamp();
@@ -151,9 +154,9 @@ export async function finalizeAction(
             const img = await generatePrisonerCard(avatarUrl || '');
             const attachment = new AttachmentBuilder(img, { name: 'prisoner.png' });
             embed.setThumbnail('attachment://prisoner.png');
-            const sentMsg = await (banroom as any).send({ embeds: [embed], files: [attachment] });
+            const sentMsg = await banroom.send({ embeds: [embed], files: [attachment] });
 
-            await (prisma as any).banLog.create({
+            await prisma.banLog.create({
                 data: {
                     playerNick: targetNick,
                     moderatorDiscordId: modDiscordId,
@@ -165,8 +168,8 @@ export async function finalizeAction(
                 }
             });
         } catch (e) {
-            const sentMsg = await (banroom as any).send({ embeds: [embed] });
-            await (prisma as any).banLog.create({
+            const sentMsg = await banroom.send({ embeds: [embed] });
+            await prisma.banLog.create({
                 data: {
                     playerNick: targetNick, moderatorDiscordId: modDiscordId,
                     channelId: BAN_ROOM_ID, messageId: sentMsg.id,
