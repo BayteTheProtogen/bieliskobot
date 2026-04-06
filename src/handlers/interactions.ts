@@ -118,7 +118,69 @@ export async function handleInteractions(interaction: Interaction) {
                      return interaction.reply({ content: '🚫 Brak dostępu.', ephemeral: true });
                 }
 
-                return interaction.reply({ content: '🛠️ Menu narzędzi administracyjnych sklepu w przygotowaniu!', ephemeral: true });
+                const embed = new EmbedBuilder()
+                    .setTitle('🛠️ Narzędzia Administracyjne Sklepu')
+                    .setDescription('Wybierz akcję, którą chcesz wykonać z poziomu administratora:')
+                    .setColor('#e74c3c');
+
+                const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                    new ButtonBuilder().setCustomId('admin_shop_additem').setLabel('🎁 Nadaj Przedmiot').setStyle(ButtonStyle.Success),
+                    new ButtonBuilder().setCustomId('admin_shop_delitem').setLabel('🗑️ Odbierz Przedmiot').setStyle(ButtonStyle.Danger)
+                );
+
+                return interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+            }
+
+            if (customId === 'admin_shop_additem') {
+                const modal = new ModalBuilder()
+                    .setCustomId('modal_admin_shop_add')
+                    .setTitle('Nadaj przedmiot graczowi');
+                    
+                const targetInput = new TextInputBuilder()
+                    .setCustomId('targetId')
+                    .setLabel('Discord ID Gracza')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true);
+                    
+                const itemInput = new TextInputBuilder()
+                    .setCustomId('itemKey')
+                    .setLabel('ID Przedmiotu (np. pozwolenie_bron, lockpick)')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true);
+
+                modal.addComponents(
+                    new ActionRowBuilder<TextInputBuilder>().addComponents(targetInput),
+                    new ActionRowBuilder<TextInputBuilder>().addComponents(itemInput)
+                );
+
+                await interaction.showModal(modal);
+                return;
+            }
+
+            if (customId === 'admin_shop_delitem') {
+                const modal = new ModalBuilder()
+                    .setCustomId('modal_admin_shop_del')
+                    .setTitle('Usuń przedmiot graczowi');
+                    
+                const targetInput = new TextInputBuilder()
+                    .setCustomId('targetId')
+                    .setLabel('Discord ID Gracza')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true);
+                    
+                const itemInput = new TextInputBuilder()
+                    .setCustomId('itemKey')
+                    .setLabel('ID Przedmiotu (np. pozwolenie_bron, lockpick)')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true);
+
+                modal.addComponents(
+                    new ActionRowBuilder<TextInputBuilder>().addComponents(targetInput),
+                    new ActionRowBuilder<TextInputBuilder>().addComponents(itemInput)
+                );
+
+                await interaction.showModal(modal);
+                return;
             }
 
             if (customId.startsWith('shop_buy|')) {
@@ -589,6 +651,78 @@ export async function handleInteractions(interaction: Interaction) {
                 }
             }
         } else if (interaction.isModalSubmit()) {
+            if (interaction.customId === 'modal_admin_shop_add') {
+                const targetId = interaction.fields.getTextInputValue('targetId');
+                const itemKey = interaction.fields.getTextInputValue('itemKey');
+                
+                const item = getItemById(itemKey);
+                if (!item) {
+                    return interaction.reply({ content: `🚫 Nie znaleziono przedmiotu o ID: ${itemKey}. Sprawdź konfigurację sklepu.`, ephemeral: true });
+                }
+
+                const citizen = await prisma.citizen.findUnique({ where: { discordId: targetId } });
+                if (!citizen) {
+                    return interaction.reply({ content: '🚫 Gracz o podanym Discord ID nie figuruje w systemie obywateli.', ephemeral: true });
+                }
+
+                let expiresAt: Date | undefined = undefined;
+                if (item.type === 'INSURANCE' && item.durationHours) {
+                    expiresAt = new Date(Date.now() + item.durationHours * 60 * 60 * 1000);
+                }
+
+                await prisma.inventory.create({
+                    data: {
+                        discordId: targetId,
+                        itemKey: item.id,
+                        itemName: item.name,
+                        type: item.type,
+                        roleId: item.roleId,
+                        expiresAt: expiresAt
+                    }
+                });
+
+                if (item.roleId && interaction.guild) {
+                    try {
+                        const member = await interaction.guild.members.fetch(targetId);
+                        if (member && !member.roles.cache.has(item.roleId)) {
+                            await member.roles.add(item.roleId);
+                        }
+                    } catch (e) {
+                        console.error('Błąd nadawania roli z admin shop tool:', e);
+                    }
+                }
+
+                return interaction.reply({ content: `🎁 Pomyślnie nadano **${item.name}** użytkownikowi <@${targetId}> za darmo!`, ephemeral: true });
+            }
+
+            if (interaction.customId === 'modal_admin_shop_del') {
+                const targetId = interaction.fields.getTextInputValue('targetId');
+                const itemKey = interaction.fields.getTextInputValue('itemKey');
+                
+                const item = getItemById(itemKey);
+                
+                const deleteResult = await prisma.inventory.deleteMany({
+                    where: { discordId: targetId, itemKey: itemKey }
+                });
+
+                if (deleteResult.count === 0) {
+                    return interaction.reply({ content: `🚫 Ten gracz nie posiada w swoim ekwipunku przedmiotu o ID: ${itemKey}.`, ephemeral: true });
+                }
+
+                if (item && item.roleId && interaction.guild) {
+                    try {
+                        const member = await interaction.guild.members.fetch(targetId);
+                        if (member && member.roles.cache.has(item.roleId)) {
+                            await member.roles.remove(item.roleId);
+                        }
+                    } catch (e) {
+                         console.error('Błąd usuwania roli z admin shop tool:', e);
+                    }
+                }
+
+                return interaction.reply({ content: `🗑️ Skasowano wpisy (${deleteResult.count}) o posiadanym **${item?.name || itemKey}** z profilu <@${targetId}>. Rola (jeśli istniała) została mu usunięta.`, ephemeral: true });
+            }
+
             const { customId } = interaction;
             if (customId.startsWith('admin_reason_modal_')) {
                 const updateId = parseInt(interaction.customId.replace('admin_reason_modal_', ''), 10);
