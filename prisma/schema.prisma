@@ -65,3 +65,16 @@ model TrackedAction {
   erlcTimestamp Int      @unique
   createdAt     DateTime @default(now())
 }
+
+model Inventory {
+  id        Int      @id @default(autoincrement())
+  discordId String
+  itemKey   String
+  itemName  String
+  type      String
+  roleId    String?
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([discordId])
+}

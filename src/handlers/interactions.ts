@@ -1,8 +1,9 @@
-import { Interaction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, AttachmentBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, UserSelectMenuInteraction, MessageFlags } from 'discord.js';
+import { Interaction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, AttachmentBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, UserSelectMenuInteraction, StringSelectMenuInteraction, MessageFlags } from 'discord.js';
 import { prisma } from '../services/db';
 import { generateIDCard, generateFineCard } from '../services/canvas';
 import { getAvatarBust, getUserInfo } from '../services/roblox';
 import { logBotDM } from '../services/dmLogger';
+import { getItemsByCategory, getItemById } from '../data/shopData';
 
 export async function handleInteractions(interaction: Interaction) {
     try {
@@ -56,8 +57,174 @@ export async function handleInteractions(interaction: Interaction) {
             }
         }
 
+        if (interaction.isStringSelectMenu()) {
+            if (interaction.customId === 'shop_category_select') {
+                await interaction.deferReply({ ephemeral: true });
+                
+                const selectedCategory = interaction.values[0].replace('cat_', '');
+                if (!['legal', 'weapons', 'tools'].includes(selectedCategory)) {
+                    return interaction.editReply({ content: 'Nieznana kategoria.' });
+                }
+
+                const items = getItemsByCategory(selectedCategory as 'legal' | 'weapons' | 'tools');
+                
+                if (items.length === 0) {
+                    return interaction.editReply({ content: 'Ta kategoria jest obecnie pusta.' });
+                }
+
+                const embed = new EmbedBuilder()
+                    .setTitle(`🛍️ Oferta Sklepu`)
+                    .setDescription('Oto dostępne przedmioty w tej sekcji. Pamiętaj, aby upewnić się, że posiadasz odpowiednie uprawnienia RP do posiadania niektórych przedmiotów (np. broni).')
+                    .setColor('#f1c40f');
+
+                const components: ActionRowBuilder<ButtonBuilder>[] = [];
+                
+                // Max 5 buttons per ActionRow, Discord limit is 5 ActionRows per message (25 items max)
+                let currentRow = new ActionRowBuilder<ButtonBuilder>();
+                
+                items.forEach((item, index) => {
+                    embed.addFields({
+                        name: `${item.name} - ${item.price.toLocaleString()} zł`,
+                        value: item.description,
+                        inline: false
+                    });
+
+                    currentRow.addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(`shop_buy|${item.id}`)
+                            .setLabel(`Kup ${item.name}`)
+                            .setStyle(ButtonStyle.Success)
+                    );
+
+                    if ((index + 1) % 5 === 0 || index === items.length - 1) {
+                        components.push(currentRow);
+                        currentRow = new ActionRowBuilder<ButtonBuilder>();
+                    }
+                });
+
+                await interaction.editReply({ embeds: [embed], components });
+                return;
+            }
+        }
+
         if (interaction.isButton()) {
             const { customId } = interaction;
+
+            if (customId.startsWith('shop_buy|')) {
+                const itemId = customId.split('|')[1];
+                const item = getItemById(itemId);
+
+                if (!item) {
+                    return interaction.reply({ content: '🚫 Ten przedmiot nie istnieje lub został wycofany z oferty.', ephemeral: true });
+                }
+
+                const citizen = await prisma.citizen.findUnique({ where: { discordId: interaction.user.id } });
+                if (!citizen) {
+                    return interaction.reply({ content: '🚫 Musisz posiadać wyrobiony dowód osobisty w systemie Obywatela.', ephemeral: true });
+                }
+
+                // Oferujemy wybór płatności -> Gotówka czy Karta (Bank)
+                const embed = new EmbedBuilder()
+                    .setTitle(`💳 Płatność: ${item.name}`)
+                    .setDescription(`Kwota do zapłaty: **${item.price.toLocaleString()} zł**\n\nWybierz formę płatności poniżej. Upewnij się, że masz wystarczające środki.`)
+                    .setColor('#e67e22');
+
+                const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                    new ButtonBuilder().setCustomId(`shop_pay_pocket|${item.id}`).setLabel('💵 Gotówka z kieszeni').setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder().setCustomId(`shop_pay_bank|${item.id}`).setLabel('💳 Karta Bankowa').setStyle(ButtonStyle.Secondary)
+                );
+
+                await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+                return;
+            }
+
+            if (customId.startsWith('shop_pay_pocket|') || customId.startsWith('shop_pay_bank|')) {
+                await interaction.deferUpdate();
+                
+                const isPocket = customId.startsWith('shop_pay_pocket|');
+                const itemId = customId.split('|')[1];
+                const item = getItemById(itemId);
+
+                if (!item) {
+                     return interaction.editReply({ content: '🚫 Błąd katalogu sklepu.', embeds: [], components: [] });
+                }
+
+                const citizen = await prisma.citizen.findUnique({ where: { discordId: interaction.user.id } });
+                if (!citizen) return interaction.editReply({ content: 'Błąd bazy danych (1).', embeds: [], components: [] });
+
+                if (isPocket && citizen.pocket < item.price) {
+                     return interaction.editReply({ content: `🚫 Nie masz wystarczająco dużo gotówki w kieszeni! (Potrzeba: ${item.price} zł)`, embeds: [], components: [] });
+                } else if (!isPocket && citizen.bank < item.price) {
+                     return interaction.editReply({ content: `🚫 Na Twoim koncie w banku brakuje środków! (Potrzeba: ${item.price} zł)`, embeds: [], components: [] });
+                }
+
+                // Check duplicates (don't allow buying second license if already active)
+                if (item.type === 'LICENSE' || item.type === 'WEAPON' || item.type === 'TOOL') {
+                    const hasItem = await prisma.inventory.findFirst({
+                        where: { discordId: citizen.discordId, itemKey: item.id }
+                    });
+                    if (hasItem) {
+                         return interaction.editReply({ content: `🚫 Posiadasz już ten przedmiot w swoim ekwipunku!`, embeds: [], components: [] });
+                    }
+                }
+
+                // Handle Insurance (extend or fresh buy)
+                let expiresAt: Date | undefined = undefined;
+                if (item.type === 'INSURANCE' && item.durationHours) {
+                    const existingInsurance = await prisma.inventory.findFirst({
+                        where: { discordId: citizen.discordId, type: 'INSURANCE' },
+                        orderBy: { expiresAt: 'desc' }
+                    });
+                    
+                    const now = new Date();
+                    const baseDate = (existingInsurance?.expiresAt && existingInsurance.expiresAt > now) ? existingInsurance.expiresAt : now;
+                    expiresAt = new Date(baseDate.getTime() + item.durationHours * 60 * 60 * 1000);
+                }
+
+                try {
+                    // Start transaction
+                    await prisma.$transaction([
+                        prisma.citizen.update({
+                            where: { discordId: citizen.discordId },
+                            data: isPocket ? { pocket: { decrement: item.price } } : { bank: { decrement: item.price } }
+                        }),
+                        prisma.inventory.create({
+                            data: {
+                                discordId: citizen.discordId,
+                                itemKey: item.id,
+                                itemName: item.name,
+                                type: item.type,
+                                roleId: item.roleId,
+                                expiresAt: expiresAt
+                            }
+                        })
+                    ]);
+                    
+                    // Nadanie ról 
+                    if (item.roleId && interaction.guild) {
+                        try {
+                            const member = await interaction.guild.members.fetch(citizen.discordId);
+                            if (member && !member.roles.cache.has(item.roleId)) {
+                                await member.roles.add(item.roleId);
+                            }
+                        } catch (e) {
+                            console.error(`Nie udało się nadać roli ${item.roleId} graczowi ${citizen.discordId}:`, e);
+                        }
+                    }
+
+                    const successEmbed = new EmbedBuilder()
+                        .setTitle(`✅ Zakupiono: ${item.name}`)
+                        .setDescription(`Opłata w wysokości **${item.price.toLocaleString()} zł** została pobrana z Twojej ${isPocket ? 'kieszeni' : 'karty bankowej'}.\nPrzedmiot znajduje się teraz w Twoim \`/ekwipunek\`.`)
+                        .setColor('#2ecc71');
+
+                    await interaction.editReply({ content: '', embeds: [successEmbed], components: [] });
+                    
+                } catch (e) {
+                    console.error('Błąd podczas zakupu', e);
+                    await interaction.editReply({ content: '🚫 Wystąpił krytyczny błąd bazy danych podczas zakupu!', embeds: [], components: [] });
+                }
+                return;
+            }
 
             if (customId === 'roblox_no') {
                 await interaction.update({ content: 'Anulowano. Spróbuj podać dokładny Nick.', embeds: [], components: [] });

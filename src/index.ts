@@ -4,6 +4,8 @@ import { dowodCommand } from './commands/dowod';
 import { economyCommands, workCommands, extraWorkCommands } from './commands/economy';
 import { economyAdminCommands } from './commands/economyAdmin';
 import { mandatCommand } from './commands/mandat';
+import { sklepCommands } from './commands/sklep';
+import { ekwipunekCommands } from './commands/ekwipunek';
 import { handleInteractions } from './handlers/interactions';
 import { erlcModeration } from './services/erlc';
 import { generatePrisonerCard } from './services/canvas';
@@ -47,7 +49,9 @@ client.once(Events.ClientReady, async () => {
                 workCommands.data.toJSON(),
                 extraWorkCommands.data.toJSON(),
                 mandatCommand.data.toJSON(),
-                economyAdminCommands.data.toJSON()
+                economyAdminCommands.data.toJSON(),
+                sklepCommands.data.toJSON(),
+                ekwipunekCommands.data.toJSON()
             ] },
         );
         console.log('Successfully reloaded application (/) commands.');
@@ -67,15 +71,16 @@ client.on('interactionCreate', async interaction => {
                 return;
             }
             await dowodCommand.execute(interaction);
-        } else if (['portfel', 'praca', 'dorobka'].includes(interaction.commandName)) {
+        } else if (['portfel', 'praca', 'dorobka', 'sklep', 'ekwipunek'].includes(interaction.commandName)) {
             if (interaction.channelId !== '1490011312669855904') {
-                await interaction.reply({ content: '🚫 Zarządzanie finansami i praca są dozwolone wyłącznie na kanale <#1490011312669855904>!', ephemeral: true });
+                await interaction.reply({ content: '🚫 Komendy ekonomii, sklepu i pracy są dozwolone wyłącznie na kanale <#1490011312669855904>!', ephemeral: true });
                 return;
             }
             if (interaction.commandName === 'portfel') await economyCommands.execute(interaction);
             if (interaction.commandName === 'praca') await workCommands.execute(interaction);
             if (interaction.commandName === 'dorobka') await extraWorkCommands.execute(interaction);
-            if (interaction.commandName === 'przelej') await economyCommands.execute(interaction);
+            if (interaction.commandName === 'sklep') await sklepCommands.execute(interaction);
+            if (interaction.commandName === 'ekwipunek') await ekwipunekCommands.execute(interaction);
         } else if (interaction.commandName === 'mandat') {
             if (interaction.channelId !== '1490365930818109490') {
                 await interaction.reply({ content: '🚫 Mandaty można wystawiać wyłącznie na kanale <#1490365930818109490>!', ephemeral: true });
