@@ -148,9 +148,7 @@ export async function finalizeAction(
 
         try {
             const avatarUrl = await getRobloxAvatar(targetNick);
-            const img = await generatePrisonerCard(
-                avatarUrl || `https://www.roblox.com/headshot-thumbnail/image?userName=${targetNick}&width=420&height=420&format=png`
-            );
+            const img = await generatePrisonerCard(avatarUrl || '');
             const attachment = new AttachmentBuilder(img, { name: 'prisoner.png' });
             embed.setThumbnail('attachment://prisoner.png');
             const sentMsg = await (banroom as any).send({ embeds: [embed], files: [attachment] });

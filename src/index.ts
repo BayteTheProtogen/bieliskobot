@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, REST, Routes, Events, Partials } from 'discord.js';
+import { Client, GatewayIntentBits, REST, Routes, Events, Partials, MessageFlags } from 'discord.js';
 import * as dotenv from 'dotenv';
 import { dowodCommand } from './commands/dowod';
 import { economyCommands, workCommands, extraWorkCommands } from './commands/economy';
@@ -122,7 +122,7 @@ client.on('interactionCreate', async interaction => {
             const reason = interaction.fields.getTextInputValue('reason');
             const durationRaw = action !== ':kick' ? interaction.fields.getTextInputValue('duration').toLowerCase() : '';
 
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
             let hours: number | null = null;
             let isPermBan = (action === ':pban');
