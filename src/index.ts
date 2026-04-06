@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, REST, Routes, Events } from 'discord.js';
+import { Client, GatewayIntentBits, REST, Routes, Events, Partials } from 'discord.js';
 import * as dotenv from 'dotenv';
 import { dowodCommand } from './commands/dowod';
 import { economyCommands, workCommands, extraWorkCommands } from './commands/economy';
@@ -18,7 +18,9 @@ const client = new Client({
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
-    ]
+        GatewayIntentBits.DirectMessages,
+    ],
+    partials: [Partials.Channel, Partials.Message, Partials.User]
 });
 
 const token = process.env.DISCORD_TOKEN;
