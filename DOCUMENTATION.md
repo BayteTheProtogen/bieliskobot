@@ -65,9 +65,19 @@ Integracja z serwerem ER:LC oraz system karania.
 ### Komendy Moderacji (!bb):
 Dostępne wyłącznie na kanale administracyjnym (`1490274396391211158`).
 *   `!bb kick [nick] [powód]` – Wyrzuca gracza z serwera Roblox.
-*   `!bb tempban [nick] [czas_h] [powód]` – Banuje gracza na X godzin. Generuje grafikę "Zza Krat" na kanale `banroom`.
+*   `!bb tempban [nick] [czas_h] [powód]` – Banuje gracza na X godzin. Generuje grafikę "Zza Krat" na kanale `logi-akcji-roblox`.
 *   `!bb permban [nick] [powód]` – Dożywotni ban (tylko Owner).
-*   `!bb unban [nick]` – Zdjęcie kary.
+*   `!bb unban [nick]` – Zdjęcie kary. **Edytuje** oryginalny embed banu w `logi-akcji-roblox` zamiast wysyłania nowej wiadomości.
+*   `!bb` *(bez argumentów)* – Wyświetla stronę pomocy.
+
+### 🤖 Detekcja Banów In-Game:
+Bot co **2 minuty** odpytuje ER:LC API w poszukiwaniu akcji moderacyjnych (`:ban`, `:kick`, `:unban`) wykonanych bezpośrednio w grze.
+Jeśli wykryje nową akcję, wysyła **konwersację DM** do odpowiedzialnej osoby:
+1.  **Bot:** "Dlaczego to zrobiłeś?" – moderator odpowiada.
+2.  **Bot:** "Na ile czasu?" – moderator podaje godziny lub `permban`.
+3.  Cała akcja jest rejestrowana w systemie tak samo jak normalne `!bb`.
+
+> ⚠️ Wymaga, aby moderator miał wyrobiony dowód osobisty (konto Roblox powiązane z Discordem).
 
 ---
 
