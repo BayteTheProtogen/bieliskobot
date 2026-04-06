@@ -148,10 +148,12 @@ client.on('interactionCreate', async interaction => {
             }
 
             await interaction.editReply({ content: `✅ Pomyślnie zarejestrowano akcję dla **${targetNick}**.` });
+            return; // Important: stay in this block
         }
-    } else {
-        await handleInteractions(interaction);
     }
+    
+    // Any other interaction (including our specialized modals) falls through here
+    await handleInteractions(interaction);
 });
 
 client.on(Events.MessageCreate, async message => {
