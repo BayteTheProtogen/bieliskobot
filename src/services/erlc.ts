@@ -13,6 +13,24 @@ export interface ERLCCommandLog {
     Command: string;   // ":ban Nick powód"
 }
 
+export interface ERLCKillLog {
+    Killed: string;
+    Killer: string;
+    Timestamp: number;
+}
+
+export interface ERLCJoinLog {
+    Player: string;
+    Join: boolean; // true = join, false = leave
+    Timestamp: number;
+}
+
+export interface ERLCModCallLog {
+    Caller: string;
+    Moderator: string | null;
+    Timestamp: number;
+}
+
 export interface ERLCBan {
     PlayerId: string;  // PlayerName only
 }
@@ -23,6 +41,36 @@ export async function getCommandLogs(): Promise<ERLCCommandLog[]> {
         return Array.isArray(res.data) ? res.data : [];
     } catch(e: any) {
         console.error('[ERLC] getCommandLogs error:', e.response?.data || e.message);
+        return [];
+    }
+}
+
+export async function getKillLogs(): Promise<ERLCKillLog[]> {
+    try {
+        const res = await axios.get(`${ERLC_API_V1}/killlogs`, { headers: erlcHeaders() });
+        return Array.isArray(res.data) ? res.data : [];
+    } catch(e: any) {
+        console.error('[ERLC] getKillLogs error:', e.response?.data || e.message);
+        return [];
+    }
+}
+
+export async function getJoinLogs(): Promise<ERLCJoinLog[]> {
+    try {
+        const res = await axios.get(`${ERLC_API_V1}/joinlogs`, { headers: erlcHeaders() });
+        return Array.isArray(res.data) ? res.data : [];
+    } catch(e: any) {
+        console.error('[ERLC] getJoinLogs error:', e.response?.data || e.message);
+        return [];
+    }
+}
+
+export async function getModCalls(): Promise<ERLCModCallLog[]> {
+    try {
+        const res = await axios.get(`${ERLC_API_V1}/modcalls`, { headers: erlcHeaders() });
+        return Array.isArray(res.data) ? res.data : [];
+    } catch(e: any) {
+        console.error('[ERLC] getModCalls error:', e.response?.data || e.message);
         return [];
     }
 }

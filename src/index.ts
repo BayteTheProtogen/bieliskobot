@@ -6,6 +6,7 @@ import { economyAdminCommands } from './commands/economyAdmin';
 import { mandatCommand } from './commands/mandat';
 import { sklepCommands } from './commands/sklep';
 import { ekwipunekCommands } from './commands/ekwipunek';
+import { logiCommand } from './commands/logi';
 import { handleInteractions } from './handlers/interactions';
 import { erlcModeration } from './services/erlc';
 import { generatePrisonerCard } from './services/canvas';
@@ -51,7 +52,8 @@ client.once(Events.ClientReady, async () => {
                 mandatCommand.data.toJSON(),
                 economyAdminCommands.data.toJSON(),
                 sklepCommands.data.toJSON(),
-                ekwipunekCommands.data.toJSON()
+                ekwipunekCommands.data.toJSON(),
+                logiCommand.data.toJSON()
             ] },
         );
         console.log('Successfully reloaded application (/) commands.');
@@ -89,6 +91,12 @@ client.on('interactionCreate', async interaction => {
             await mandatCommand.execute(interaction);
         } else if (interaction.commandName === 'eco-admin') {
             await economyAdminCommands.execute(interaction);
+        } else if (interaction.commandName === 'logi') {
+            if (interaction.channelId !== '1490274396391211158') {
+                await interaction.reply({ content: '🚫 Komendy `/logi` można używać wyłącznie na wydzielonym kanale <#1490274396391211158>!', ephemeral: true });
+                return;
+            }
+            await logiCommand.execute(interaction);
         }
     } else if (interaction.isButton()) {
         const customId = interaction.customId;
