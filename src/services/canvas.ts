@@ -1,5 +1,6 @@
 import { GlobalFonts, createCanvas, loadImage } from '@napi-rs/canvas';
 import { join } from 'path';
+import axios from 'axios';
 
 GlobalFonts.registerFromPath(join(__dirname, '../../fonts/Roboto-Regular.ttf'), 'Roboto');
 GlobalFonts.registerFromPath(join(__dirname, '../../fonts/Roboto-Bold.ttf'), 'RobotoBold');
@@ -258,10 +259,16 @@ export async function generatePrisonerCard(avatarUrl: string): Promise<Buffer> {
 
     if (avatarUrl) {
         try {
-            const avatar = await loadImage(avatarUrl);
+            // Fetch as buffer to circumvent potential redirect/UA issues
+            const response = await axios.get(avatarUrl, { 
+                responseType: 'arraybuffer',
+                headers: { 'User-Agent': 'Mozilla/5.0' }
+            });
+            const avatar = await loadImage(Buffer.from(response.data));
+            
             ctx.save();
             ctx.drawImage(avatar, 50, 50, 700, 700);
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'; // Darken slightly
             ctx.fillRect(50, 50, 700, 700);
             ctx.restore();
         } catch (e) {

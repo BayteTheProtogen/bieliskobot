@@ -8,8 +8,9 @@ import { handleInteractions } from './handlers/interactions';
 import { erlcModeration } from './services/erlc';
 import { generatePrisonerCard } from './services/canvas';
 import { prisma } from './services/db';
-import { EmbedBuilder, AttachmentBuilder, TextChannel } from 'discord.js';
+import { EmbedBuilder, AttachmentBuilder, TextChannel, ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
 import { startERLCPolling } from './services/erlcPoller';
+import { BAN_ROOM_ID, finalizeAction } from './services/modActions';
 
 dotenv.config();
 
@@ -84,6 +85,70 @@ client.on('interactionCreate', async interaction => {
         } else if (interaction.commandName === 'eco-admin') {
             await economyAdminCommands.execute(interaction);
         }
+    } else if (interaction.isButton()) {
+        const customId = interaction.customId;
+        if (customId.startsWith('mod_action:')) {
+            const [_, targetNick, erlcTimestamp, action] = customId.split(':');
+            
+            const modal = new ModalBuilder()
+                .setCustomId(`mod_modal:${targetNick}:${erlcTimestamp}:${action}`)
+                .setTitle(`Uzupełnij dane: ${targetNick}`);
+
+            const reasonInput = new TextInputBuilder()
+                .setCustomId('reason')
+                .setLabel("Dlaczego? (Powód)")
+                .setStyle(TextInputStyle.Paragraph)
+                .setPlaceholder("Podaj powód kary...")
+                .setRequired(true);
+
+            const durationInput = new TextInputBuilder()
+                .setCustomId('duration')
+                .setLabel(action === ':kick' ? "Pole ignorowane dla kicka" : "Na ile czasu? (Liczba h lub 'perm')")
+                .setStyle(TextInputStyle.Short)
+                .setPlaceholder(action === ':kick' ? "Zostaw puste" : "Np. 24 lub perm")
+                .setRequired(action !== ':kick' && action !== ':unban');
+
+            modal.addComponents(
+                new ActionRowBuilder<TextInputBuilder>().addComponents(reasonInput),
+                new ActionRowBuilder<TextInputBuilder>().addComponents(durationInput)
+            );
+
+            await interaction.showModal(modal);
+        }
+    } else if (interaction.isModalSubmit()) {
+        const customId = interaction.customId;
+        if (customId.startsWith('mod_modal:')) {
+            const [_, targetNick, erlcTimestamp, action] = customId.split(':');
+            const reason = interaction.fields.getTextInputValue('reason');
+            const durationRaw = action !== ':kick' ? interaction.fields.getTextInputValue('duration').toLowerCase() : '';
+
+            await interaction.deferReply({ ephemeral: true });
+
+            let hours: number | null = null;
+            let isPermBan = (action === ':pban');
+
+            if (action === ':ban') {
+                if (durationRaw === 'perm' || durationRaw === 'permban') {
+                    isPermBan = true;
+                } else {
+                    const parsed = parseInt(durationRaw);
+                    if (!isNaN(parsed) && parsed > 0) hours = parsed;
+                    else isPermBan = true;
+                }
+            }
+
+            await finalizeAction(client, interaction.user, interaction.user.id, action, targetNick, reason, hours, isPermBan);
+            
+            // Edit original DM message to show it's done
+            if (interaction.message) {
+                const finishedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
+                    .setColor('#2ecc71')
+                    .setDescription(`✅ **Dane uzupełnione!**\nGracz: **${targetNick}**\nPowód: ${reason}\nCzas: ${isPermBan ? 'Permanentny' : (hours ? hours + 'h' : '—')}`);
+                await interaction.message.edit({ embeds: [finishedEmbed], components: [] });
+            }
+
+            await interaction.editReply({ content: `✅ Pomyślnie zarejestrowano akcję dla **${targetNick}**.` });
+        }
     } else {
         await handleInteractions(interaction);
     }
@@ -92,7 +157,6 @@ client.on('interactionCreate', async interaction => {
 client.on(Events.MessageCreate, async message => {
     if (message.author.bot || !message.content.startsWith('!bb ')) return;
 
-    const BAN_ROOM_ID = '1490303478965207181';
     const ADMIN_CHANNEL_ID = '1490274396391211158';
     const OWNER_ROLE_ID = '1490053669830393996';
 
