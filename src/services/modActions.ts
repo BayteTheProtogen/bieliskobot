@@ -1,8 +1,31 @@
 import { Client, EmbedBuilder, AttachmentBuilder, User, TextChannel } from 'discord.js';
 import { prisma } from './db';
 import { generatePrisonerCard } from './canvas';
+import axios from 'axios';
 
 export const BAN_ROOM_ID = '1490073045002485991';
+
+async function getRobloxAvatar(nick: string): Promise<string | null> {
+    try {
+        // Step 1: Get userId from username
+        const userRes = await axios.post('https://users.roblox.com/v1/usernames/users', {
+            usernames: [nick],
+            excludeBannedUsers: false
+        });
+        
+        const userData = userRes.data.data?.[0];
+        if (!userData) return null;
+        
+        const userId = userData.id;
+        
+        // Step 2: Get headshot thumbnail
+        const thumbRes = await axios.get(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=420x420&format=Png&isCircular=false`);
+        return thumbRes.data.data?.[0]?.imageUrl || null;
+    } catch (e) {
+        console.error('Błąd pobierania avatara Robloxa:', e);
+        return null;
+    }
+}
 
 export async function finalizeAction(
     client: Client,
@@ -77,7 +100,8 @@ export async function finalizeAction(
                     const originalEmbed = banMsg.embeds[0];
                     const updatedEmbed = EmbedBuilder.from(originalEmbed)
                         .setColor('#2ecc71')
-                        .addFields({ name: '✅ ODBANOWANY', value: `<t:${Math.floor(Date.now() / 1000)}:R> przez ${user.tag}`, inline: false });
+                        .setThumbnail(null) // Remove prisoner card on unban to avoid double image
+                        .addFields({ name: '✅ ODBANOWANY', value: `<t:${Math.floor(Date.now() / 1000)}:R> • Moderator: ${user.tag}`, inline: false });
                     await banMsg.edit({ embeds: [updatedEmbed] });
                     await (prisma as any).banLog.update({
                         where: { id: banLog.id },
@@ -118,8 +142,9 @@ export async function finalizeAction(
                 ).setTimestamp();
 
         try {
+            const avatarUrl = await getRobloxAvatar(targetNick);
             const img = await generatePrisonerCard(
-                `https://www.roblox.com/headshot-thumbnail/image?userName=${targetNick}&width=420&height=420&format=png`
+                avatarUrl || `https://www.roblox.com/headshot-thumbnail/image?userName=${targetNick}&width=420&height=420&format=png`
             );
             const attachment = new AttachmentBuilder(img, { name: 'prisoner.png' });
             embed.setThumbnail('attachment://prisoner.png');
@@ -137,7 +162,8 @@ export async function finalizeAction(
                     isPermBan,
                 }
             });
-        } catch {
+        } catch (e) {
+            console.error('Błąd przy wysyłaniu karty banu:', e);
             const sentMsg = await (banroom as any).send({ embeds: [embed] });
             await (prisma as any).banLog.create({
                 data: {
