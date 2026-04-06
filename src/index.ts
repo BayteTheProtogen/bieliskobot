@@ -137,7 +137,7 @@ client.on('interactionCreate', async interaction => {
                 }
             }
 
-            await finalizeAction(client, interaction.user, interaction.user.id, action, targetNick, reason, hours, isPermBan);
+            await finalizeAction(client, interaction.user, interaction.user.id, action, targetNick, reason, hours, isPermBan, 'game');
             
             // Edit original DM message to show it's done
             if (interaction.message) {
@@ -190,7 +190,7 @@ client.on(Events.MessageCreate, async message => {
 
         const result = await erlcModeration.kick(nick, reason);
         if (result.success) {
-            await finalizeAction(client, message.author, message.author.id, ':kick', nick, reason, null, false);
+            await finalizeAction(client, message.author, message.author.id, ':kick', nick, reason, null, false, 'discord');
             message.reply(`✅ Wyrzucono **${nick}** z serwera.`);
         } else {
             message.reply(`❌ Błąd: ${result.error}`);
@@ -208,7 +208,7 @@ client.on(Events.MessageCreate, async message => {
 
         const result = await erlcModeration.ban(nick, `${timeH}h`, reason);
         if (result.success) {
-            await finalizeAction(client, message.author, message.author.id, ':ban', nick, reason, timeH, false);
+            await finalizeAction(client, message.author, message.author.id, ':ban', nick, reason, timeH, false, 'discord');
             message.reply(`✅ Zbanowano **${nick}** na ${timeH}h.`);
         } else {
             message.reply(`❌ Błąd: ${result.error}`);
@@ -225,7 +225,7 @@ client.on(Events.MessageCreate, async message => {
 
         const result = await erlcModeration.permBan(nick, reason);
         if (result.success) {
-            await finalizeAction(client, message.author, message.author.id, ':pban', nick, reason, null, true);
+            await finalizeAction(client, message.author, message.author.id, ':pban', nick, reason, null, true, 'discord');
             message.reply(`✅ Zbanowano permanentnie **${nick}**.`);
         } else {
             message.reply(`❌ Błąd: ${result.error}`);
@@ -239,7 +239,7 @@ client.on(Events.MessageCreate, async message => {
 
         const result = await erlcModeration.unban(nick);
         if (result.success) {
-            await finalizeAction(client, message.author, message.author.id, ':unban', nick, 'Zdjęcie kary', null, false);
+            await finalizeAction(client, message.author, message.author.id, ':unban', nick, 'Zdjęcie kary', null, false, 'discord');
             message.reply(`✅ Odbanowano **${nick}**.`);
         } else {
             message.reply(`❌ Błąd: ${result.error}`);
