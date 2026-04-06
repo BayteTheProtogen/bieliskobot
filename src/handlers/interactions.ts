@@ -227,7 +227,7 @@ export async function handleInteractions(interaction: Interaction) {
 
                 const input = new TextInputBuilder()
                     .setCustomId('target_player')
-                    .setLabel('Discord ID lub Nick w Roblox (z u. wiel. liter)')
+                    .setLabel('Discord ID lub Nick w Roblox:')
                     .setPlaceholder('np. 1234567890 albo JanekKowalski')
                     .setStyle(TextInputStyle.Short)
                     .setRequired(true);
@@ -856,6 +856,8 @@ export async function handleInteractions(interaction: Interaction) {
 
             if (customId.startsWith('admin_reason_modal_')) {
                 const updateId = parseInt(interaction.customId.replace('admin_reason_modal_', ''), 10);
+                if (isNaN(updateId)) return interaction.reply({ content: 'Nieprawidłowy ID podania.', ephemeral: true });
+
                 const reason = interaction.fields.getTextInputValue('reason');
                 
                 const pending = await prisma.pendingUpdate.findUnique({ where: { id: updateId } });
