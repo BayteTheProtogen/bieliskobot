@@ -1,4 +1,4 @@
-import { Interaction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, AttachmentBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, UserSelectMenuInteraction, StringSelectMenuInteraction, MessageFlags } from 'discord.js';
+import { Interaction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, AttachmentBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, UserSelectMenuInteraction, StringSelectMenuInteraction, StringSelectMenuBuilder, MessageFlags } from 'discord.js';
 import { prisma } from '../services/db';
 import { generateIDCard, generateFineCard } from '../services/canvas';
 import { getAvatarBust, getUserInfo } from '../services/roblox';
@@ -105,6 +105,84 @@ export async function handleInteractions(interaction: Interaction) {
                 await interaction.editReply({ embeds: [embed], components });
                 return;
             }
+
+            if (interaction.customId.startsWith('admin_shop_add_select|')) {
+                const targetDiscordId = interaction.customId.split('|')[1];
+                const selectedItemId = interaction.values[0];
+                await interaction.deferUpdate();
+
+                const citizen = await prisma.citizen.findUnique({ where: { discordId: targetDiscordId } });
+                if (!citizen) return interaction.editReply({ content: 'Błąd bazy - nie znaleziono użytkownika.', embeds: [], components: [] });
+
+                const item = getItemById(selectedItemId);
+                if (!item) return interaction.editReply({ content: 'Przedmiot nie istnieje w bazie.', embeds: [], components: [] });
+
+                // Check duplicates for unique items
+                if (item.type === 'LICENSE' || item.type === 'WEAPON' || item.type === 'TOOL') {
+                    const hasItem = await prisma.inventory.findFirst({ where: { discordId: targetDiscordId, itemKey: item.id } });
+                    if (hasItem) return interaction.editReply({ content: `🚫 Obywatel posiada już ten przedmiot.`, embeds: [], components: [] });
+                }
+
+                let expiresAt: Date | undefined = undefined;
+                if (item.type === 'INSURANCE' && item.durationHours) {
+                    const now = new Date();
+                    expiresAt = new Date(now.getTime() + item.durationHours * 60 * 60 * 1000);
+                }
+
+                await prisma.inventory.create({
+                    data: {
+                        discordId: targetDiscordId,
+                        itemKey: item.id,
+                        itemName: item.name,
+                        type: item.type,
+                        roleId: item.roleId,
+                        expiresAt: expiresAt
+                    }
+                });
+
+                if (item.roleId && interaction.guild) {
+                    try {
+                        const member = await interaction.guild.members.fetch(targetDiscordId);
+                        if (member && !member.roles.cache.has(item.roleId)) {
+                            await member.roles.add(item.roleId);
+                        }
+                    } catch (e) { console.error('Błąd Roli AdminAdd:', e); }
+                }
+
+                try {
+                    const targetUser = await interaction.client.users.fetch(targetDiscordId);
+                    if (targetUser) await targetUser.send(`🎁 **Administracja Obywatelstwa** nadała Ci nowy przedmiot: **${item.name}**.`);
+                } catch (dmErr) { console.error('Nie udało się wysłać DM (Sklep Dodaj):', dmErr); }
+                return interaction.editReply({ content: `✅ Pomyślnie dodano **${item.name}** do ekwipunku gracza <@${targetDiscordId}>.`, components: [] });
+            }
+
+            if (interaction.customId.startsWith('admin_shop_remove_select|')) {
+                const targetDiscordId = interaction.customId.split('|')[1];
+                const selectedRecordId = parseInt(interaction.values[0], 10);
+                await interaction.deferUpdate();
+
+                const inventoryRecord = await prisma.inventory.findUnique({ where: { id: selectedRecordId } });
+                if (!inventoryRecord || inventoryRecord.discordId !== targetDiscordId) {
+                    return interaction.editReply({ content: '🚫 Rekord nie istnieje lub nie należy do gracza.', embeds: [], components: [] });
+                }
+
+                await prisma.inventory.delete({ where: { id: selectedRecordId } });
+
+                if (inventoryRecord.roleId && interaction.guild) {
+                    try {
+                        const member = await interaction.guild.members.fetch(targetDiscordId);
+                        if (member && member.roles.cache.has(inventoryRecord.roleId)) {
+                            await member.roles.remove(inventoryRecord.roleId);
+                        }
+                    } catch (e) { console.error('Błąd Roli AdminRemove:', e); }
+                }
+
+                try {
+                    const targetUser = await interaction.client.users.fetch(targetDiscordId);
+                    if (targetUser) await targetUser.send(`➖ **Administracja Obywatelstwa** usunęła przedmiot z Twojego ekwipunku: **${inventoryRecord.itemName}**.`);
+                } catch (dmErr) { console.error('Nie udało się wysłać DM (Sklep Usuń):', dmErr); }
+                return interaction.editReply({ content: `✅ Pomyślnie zabrano **${inventoryRecord.itemName}** z ekwipunku gracza <@${targetDiscordId}>.`, components: [] });
+            }
         }
 
         if (interaction.isButton()) {
@@ -120,67 +198,81 @@ export async function handleInteractions(interaction: Interaction) {
 
                 const embed = new EmbedBuilder()
                     .setTitle('🛠️ Narzędzia Administracyjne Sklepu')
-                    .setDescription('Wybierz akcję, którą chcesz wykonać z poziomu administratora:')
+                    .setDescription('Wybierz akcję, którą chcesz wykonać. System poprosi Cię później o Discord ID lub Nick postaci, na której chcesz przeprowadzić operację.')
                     .setColor('#e74c3c');
 
-                const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                    new ButtonBuilder().setCustomId('admin_shop_additem').setLabel('🎁 Nadaj Przedmiot').setStyle(ButtonStyle.Success),
-                    new ButtonBuilder().setCustomId('admin_shop_delitem').setLabel('🗑️ Odbierz Przedmiot').setStyle(ButtonStyle.Danger)
+                const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                    new ButtonBuilder().setCustomId('admin_shop_check_btn').setLabel('Sprawdź EQ gracza').setStyle(ButtonStyle.Primary).setEmoji('👁️'),
+                    new ButtonBuilder().setCustomId('admin_shop_add_btn').setLabel('Dodaj do EQ').setStyle(ButtonStyle.Success).setEmoji('➕')
                 );
 
-                return interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+                const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                    new ButtonBuilder().setCustomId('admin_shop_remove_btn').setLabel('Usuń z EQ').setStyle(ButtonStyle.Secondary).setEmoji('➖'),
+                    new ButtonBuilder().setCustomId('admin_shop_wipe_btn').setLabel('Wymaż całę EQ').setStyle(ButtonStyle.Danger).setEmoji('🗑️')
+                );
+
+                return interaction.reply({ embeds: [embed], components: [row1, row2], ephemeral: true });
             }
 
-            if (customId === 'admin_shop_additem') {
-                const modal = new ModalBuilder()
-                    .setCustomId('modal_admin_shop_add')
-                    .setTitle('Nadaj przedmiot graczowi');
-                    
-                const targetInput = new TextInputBuilder()
-                    .setCustomId('targetId')
-                    .setLabel('Discord ID Gracza')
-                    .setStyle(TextInputStyle.Short)
-                    .setRequired(true);
-                    
-                const itemInput = new TextInputBuilder()
-                    .setCustomId('itemKey')
-                    .setLabel('ID Przedmiotu (np. pozwolenie_bron, lockpick)')
+            if (['admin_shop_check_btn', 'admin_shop_add_btn', 'admin_shop_remove_btn', 'admin_shop_wipe_btn'].includes(customId)) {
+                const actionMapping: Record<string, { id: string, title: string }> = {
+                    'admin_shop_check_btn': { id: 'admin_shop_check_modal', title: '👁️ Sprawdź EQ Gracza' },
+                    'admin_shop_add_btn': { id: 'admin_shop_add_modal', title: '➕ Dodaj do EQ' },
+                    'admin_shop_remove_btn': { id: 'admin_shop_remove_modal', title: '➖ Usuń z EQ' },
+                    'admin_shop_wipe_btn': { id: 'admin_shop_wipe_modal', title: '🗑️ Wymaż całę EQ' }
+                };
+                
+                const meta = actionMapping[customId];
+                const modal = new ModalBuilder().setCustomId(meta.id).setTitle(meta.title);
+
+                const input = new TextInputBuilder()
+                    .setCustomId('target_player')
+                    .setLabel('Discord ID lub Nick w Roblox (z u. wiel. liter)')
+                    .setPlaceholder('np. 1234567890 albo JanekKowalski')
                     .setStyle(TextInputStyle.Short)
                     .setRequired(true);
 
-                modal.addComponents(
-                    new ActionRowBuilder<TextInputBuilder>().addComponents(targetInput),
-                    new ActionRowBuilder<TextInputBuilder>().addComponents(itemInput)
-                );
+                const row = new ActionRowBuilder<TextInputBuilder>().addComponents(input);
+                modal.addComponents(row);
 
                 await interaction.showModal(modal);
                 return;
             }
 
-            if (customId === 'admin_shop_delitem') {
-                const modal = new ModalBuilder()
-                    .setCustomId('modal_admin_shop_del')
-                    .setTitle('Usuń przedmiot graczowi');
-                    
-                const targetInput = new TextInputBuilder()
-                    .setCustomId('targetId')
-                    .setLabel('Discord ID Gracza')
-                    .setStyle(TextInputStyle.Short)
-                    .setRequired(true);
-                    
-                const itemInput = new TextInputBuilder()
-                    .setCustomId('itemKey')
-                    .setLabel('ID Przedmiotu (np. pozwolenie_bron, lockpick)')
-                    .setStyle(TextInputStyle.Short)
-                    .setRequired(true);
+            if (customId.startsWith('admin_shop_wipe_confirm|')) {
+                const targetDiscordId = customId.split('|')[1];
+                await interaction.deferUpdate();
 
-                modal.addComponents(
-                    new ActionRowBuilder<TextInputBuilder>().addComponents(targetInput),
-                    new ActionRowBuilder<TextInputBuilder>().addComponents(itemInput)
-                );
+                const items = await prisma.inventory.findMany({ where: { discordId: targetDiscordId } });
+                
+                // Zdejmij wszystkie role
+                if (interaction.guild) {
+                    try {
+                        const member = await interaction.guild.members.fetch(targetDiscordId);
+                        if (member) {
+                            for (const item of items) {
+                                if (item.roleId && member.roles.cache.has(item.roleId)) {
+                                    await member.roles.remove(item.roleId);
+                                }
+                            }
+                        }
+                    } catch (e) {
+                         console.error('Błąd pobierania membera podczas wymazywania EQ', e);
+                    }
+                }
 
-                await interaction.showModal(modal);
-                return;
+                await prisma.inventory.deleteMany({ where: { discordId: targetDiscordId } });
+                
+                // Powiadomienie DM (logBotDM)
+                const citizen = await prisma.citizen.findUnique({ where: { discordId: targetDiscordId } });
+                if (citizen) {
+                    try {
+                        const targetUser = await interaction.client.users.fetch(targetDiscordId);
+                        if (targetUser) await targetUser.send(`🗑️ Administracja Obywatelstwa **całkowicie wyczyściła** Twój ekwipunek oraz wszystkie z nim związane licencje.`);
+                    } catch (dmErr) { console.error('Nie udało się wysłać DM (Sklep Wipe):', dmErr); }
+                }
+
+                return interaction.editReply({ content: `✅ Ekwipunek gracza <@${targetDiscordId}> został w pełni wykreślony z systemu, a powiązane rangi odebrane.`, embeds: [], components: [] });
             }
 
             if (customId.startsWith('shop_buy|')) {
@@ -651,79 +743,117 @@ export async function handleInteractions(interaction: Interaction) {
                 }
             }
         } else if (interaction.isModalSubmit()) {
-            if (interaction.customId === 'modal_admin_shop_add') {
-                const targetId = interaction.fields.getTextInputValue('targetId');
-                const itemKey = interaction.fields.getTextInputValue('itemKey');
-                
-                const item = getItemById(itemKey);
-                if (!item) {
-                    return interaction.reply({ content: `🚫 Nie znaleziono przedmiotu o ID: ${itemKey}. Sprawdź konfigurację sklepu.`, ephemeral: true });
-                }
-
-                const citizen = await prisma.citizen.findUnique({ where: { discordId: targetId } });
-                if (!citizen) {
-                    return interaction.reply({ content: '🚫 Gracz o podanym Discord ID nie figuruje w systemie obywateli.', ephemeral: true });
-                }
-
-                let expiresAt: Date | undefined = undefined;
-                if (item.type === 'INSURANCE' && item.durationHours) {
-                    expiresAt = new Date(Date.now() + item.durationHours * 60 * 60 * 1000);
-                }
-
-                await prisma.inventory.create({
-                    data: {
-                        discordId: targetId,
-                        itemKey: item.id,
-                        itemName: item.name,
-                        type: item.type,
-                        roleId: item.roleId,
-                        expiresAt: expiresAt
-                    }
-                });
-
-                if (item.roleId && interaction.guild) {
-                    try {
-                        const member = await interaction.guild.members.fetch(targetId);
-                        if (member && !member.roles.cache.has(item.roleId)) {
-                            await member.roles.add(item.roleId);
-                        }
-                    } catch (e) {
-                        console.error('Błąd nadawania roli z admin shop tool:', e);
-                    }
-                }
-
-                return interaction.reply({ content: `🎁 Pomyślnie nadano **${item.name}** użytkownikowi <@${targetId}> za darmo!`, ephemeral: true });
-            }
-
-            if (interaction.customId === 'modal_admin_shop_del') {
-                const targetId = interaction.fields.getTextInputValue('targetId');
-                const itemKey = interaction.fields.getTextInputValue('itemKey');
-                
-                const item = getItemById(itemKey);
-                
-                const deleteResult = await prisma.inventory.deleteMany({
-                    where: { discordId: targetId, itemKey: itemKey }
-                });
-
-                if (deleteResult.count === 0) {
-                    return interaction.reply({ content: `🚫 Ten gracz nie posiada w swoim ekwipunku przedmiotu o ID: ${itemKey}.`, ephemeral: true });
-                }
-
-                if (item && item.roleId && interaction.guild) {
-                    try {
-                        const member = await interaction.guild.members.fetch(targetId);
-                        if (member && member.roles.cache.has(item.roleId)) {
-                            await member.roles.remove(item.roleId);
-                        }
-                    } catch (e) {
-                         console.error('Błąd usuwania roli z admin shop tool:', e);
-                    }
-                }
-
-                return interaction.reply({ content: `🗑️ Skasowano wpisy (${deleteResult.count}) o posiadanym **${item?.name || itemKey}** z profilu <@${targetId}>. Rola (jeśli istniała) została mu usunięta.`, ephemeral: true });
-            }
-
             const { customId } = interaction;
+            
+            if (['admin_shop_check_modal', 'admin_shop_add_modal', 'admin_shop_remove_modal', 'admin_shop_wipe_modal'].includes(customId)) {
+                await interaction.deferReply({ ephemeral: true });
+
+                const targetPlayerInput = interaction.fields.getTextInputValue('target_player').trim();
+                const citizen = await prisma.citizen.findFirst({
+                    where: {
+                        OR: [
+                            { discordId: targetPlayerInput },
+                            { robloxNick: targetPlayerInput }
+                        ]
+                    }
+                });
+
+                if (!citizen) {
+                    return interaction.editReply({ content: `🚫 Nie znaleziono Obywatela o podanym ID/Nicku: **${targetPlayerInput}**` });
+                }
+
+                if (customId === 'admin_shop_check_modal') {
+                    const items = await prisma.inventory.findMany({ where: { discordId: citizen.discordId } });
+                    
+                    const embed = new EmbedBuilder()
+                        .setTitle(`🎒 Ekwipunek: ${citizen.firstName} ${citizen.lastName}`)
+                        .setDescription(`UID: ${citizen.citizenNumber} | Discord: <@${citizen.discordId}> (ID: ${citizen.discordId})`)
+                        .setColor('#3498db');
+
+                    if (items.length === 0) {
+                        embed.setDescription(embed.data.description + '\n\n**Obywatel jest czysty. Brak jakichkolwiek przedmiotów.**');
+                    } else {
+                        const dict: Record<string, string[]> = {};
+                        items.forEach(item => {
+                            if (!dict[item.type]) dict[item.type] = [];
+                            
+                            let expireText = '';
+                            if (item.expiresAt) {
+                                expireText = item.expiresAt > new Date() 
+                                    ? `*(Wygasa: <t:${Math.floor(item.expiresAt.getTime() / 1000)}:R>)*`
+                                    : `*(❌ Wygasłe)*`;
+                            }
+                            dict[item.type].push(`• ${item.itemName} ${expireText}`);
+                        });
+                        
+                        if (dict['LICENSE']) embed.addFields({ name: '📄 Licencje i Dokumenty', value: dict['LICENSE'].join('\n') });
+                        if (dict['WEAPON']) embed.addFields({ name: '🔫 Broń', value: dict['WEAPON'].join('\n') });
+                        if (dict['TOOL']) embed.addFields({ name: '🛠️ Narzędzia', value: dict['TOOL'].join('\n') });
+                        if (dict['INSURANCE']) embed.addFields({ name: '🏥 Ubezpieczenia', value: dict['INSURANCE'].join('\n') });
+                    }
+
+                    return interaction.editReply({ embeds: [embed] });
+                }
+
+                if (customId === 'admin_shop_wipe_modal') {
+                    const items = await prisma.inventory.findMany({ where: { discordId: citizen.discordId } });
+                    if (items.length === 0) return interaction.editReply({ content: `Gracz **${citizen.robloxNick}** ma już puste ekwipunek.`});
+
+                    const embed = new EmbedBuilder()
+                        .setTitle(`🗑️ Czyszczenie asortymentu!`)
+                        .setDescription(`Czy NA PEWNO chcesz usunąć **wszystkie (${items.length}) przedmioty** dla gracza <@${citizen.discordId}>? Tej akcji nie można cofnąć!`)
+                        .setColor('#c0392b');
+
+                    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                        new ButtonBuilder().setCustomId(`admin_shop_wipe_confirm|${citizen.discordId}`).setLabel('Potwierdź Wymazanie').setStyle(ButtonStyle.Danger)
+                    );
+
+                    return interaction.editReply({ embeds: [embed], components: [row] });
+                }
+
+                if (customId === 'admin_shop_add_modal') {
+                    // Prezentujemy cały sklep w postaci select menu dla tego gracza
+                    // Pobieramy całą liste z shopData
+                    const shopDataModule = await import('../data/shopData');
+                    const allItems = [
+                        ...shopDataModule.getItemsByCategory('legal'),
+                        ...shopDataModule.getItemsByCategory('weapons'),
+                        ...shopDataModule.getItemsByCategory('tools')
+                    ];
+
+                    const select = new StringSelectMenuBuilder()
+                        .setCustomId(`admin_shop_add_select|${citizen.discordId}`)
+                        .setPlaceholder('Wybierz przedmiot do nadania...')
+                        .addOptions(allItems.map(it => ({
+                            label: it.name,
+                            description: it.type,
+                            value: it.id
+                        })));
+
+                    const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
+                    return interaction.editReply({ content: `Wybierz przedmiot, który chcesz nadać Obywatelowi **${citizen.firstName} ${citizen.lastName}**:`, components: [row] });
+                }
+
+                if (customId === 'admin_shop_remove_modal') {
+                    const items = await prisma.inventory.findMany({ where: { discordId: citizen.discordId } });
+                    if (items.length === 0) return interaction.editReply({ content: `Gracz **${citizen.robloxNick}** ma już puste ekwipunek.`});
+
+                    const select = new StringSelectMenuBuilder()
+                        .setCustomId(`admin_shop_remove_select|${citizen.discordId}`)
+                        .setPlaceholder('Wybierz przedmiot do usunięcia...')
+                        .addOptions(items.slice(0, 25).map(it => ({
+                            label: it.itemName,
+                            description: `Dodano: ${it.createdAt.toLocaleDateString()}`,
+                            value: it.id.toString()
+                        })));
+
+                    const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
+                    return interaction.editReply({ content: `Wybierz przedmiot, który chcesz usunąć Obywatelowi **${citizen.firstName} ${citizen.lastName}**:`, components: [row] });
+                }
+
+                return;
+            }
+
             if (customId.startsWith('admin_reason_modal_')) {
                 const updateId = parseInt(interaction.customId.replace('admin_reason_modal_', ''), 10);
                 const reason = interaction.fields.getTextInputValue('reason');
