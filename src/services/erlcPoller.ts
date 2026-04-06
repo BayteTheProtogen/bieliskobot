@@ -64,7 +64,7 @@ async function pollOnce(client: Client) {
 
                 const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
                     new ButtonBuilder()
-                        .setCustomId(`mod_action:${targetNick}:${erlcTimestamp}:${action}`)
+                        .setCustomId(`mod_action|${targetNick}|${erlcTimestamp}|${action}`)
                         .setLabel(`📝 Uzupełnij dane: ${targetNick}`)
                         .setStyle(ButtonStyle.Primary)
                 );

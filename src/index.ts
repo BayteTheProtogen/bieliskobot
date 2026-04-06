@@ -87,11 +87,11 @@ client.on('interactionCreate', async interaction => {
         }
     } else if (interaction.isButton()) {
         const customId = interaction.customId;
-        if (customId.startsWith('mod_action:')) {
-            const [_, targetNick, erlcTimestamp, action] = customId.split(':');
+        if (customId.startsWith('mod_action|')) {
+            const [_, targetNick, erlcTimestamp, action] = customId.split('|');
             
             const modal = new ModalBuilder()
-                .setCustomId(`mod_modal:${targetNick}:${erlcTimestamp}:${action}`)
+                .setCustomId(`mod_modal|${targetNick}|${erlcTimestamp}|${action}`)
                 .setTitle(`Uzupełnij dane: ${targetNick}`);
 
             const reasonInput = new TextInputBuilder()
@@ -117,8 +117,8 @@ client.on('interactionCreate', async interaction => {
         }
     } else if (interaction.isModalSubmit()) {
         const customId = interaction.customId;
-        if (customId.startsWith('mod_modal:')) {
-            const [_, targetNick, erlcTimestamp, action] = customId.split(':');
+        if (customId.startsWith('mod_modal|')) {
+            const [_, targetNick, erlcTimestamp, action] = customId.split('|');
             const reason = interaction.fields.getTextInputValue('reason');
             const durationRaw = action !== ':kick' ? interaction.fields.getTextInputValue('duration').toLowerCase() : '';
 
