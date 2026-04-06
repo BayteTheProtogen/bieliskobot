@@ -25,31 +25,6 @@ model Citizen {
   isPermBanned  Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-  punishments   Punishment[]
-}
-
-enum PunishmentType {
-  KICK
-  BAN
-  PERMBAN
-}
-
-model Punishment {
-  id          Int            @id @default(autoincrement())
-  citizenId   String
-  citizen     Citizen        @relation(fields: [citizenId], references: [discordId])
-  type        PunishmentType
-  reason      String
-  duration    String?        // np. "24h"
-  messageId   String?        // ID wiadomości na Discordzie
-  isActive    Boolean        @default(true)
-  createdAt   DateTime       @default(now())
-  resolvedAt  DateTime?
-}
-
-model AuditLogState {
-  id                    Int      @id @default(1)
-  lastProcessedTimestamp DateTime @default(now())
 }
 
 model PendingUpdate {
@@ -69,4 +44,24 @@ model PendingInvalidation {
   id        Int      @id @default(autoincrement())
   discordId String
   createdAt DateTime @default(now())
+}
+
+model BanLog {
+  id                 String    @id @default(cuid())
+  playerNick         String
+  moderatorDiscordId String?
+  channelId          String
+  messageId          String
+  reason             String    @default("Brak powodu")
+  bannedUntil        DateTime?
+  isPermBan          Boolean   @default(false)
+  unbannedAt         DateTime?
+  unbanModDiscordId  String?
+  createdAt          DateTime  @default(now())
+}
+
+model TrackedAction {
+  id            String   @id @default(cuid())
+  erlcTimestamp Int      @unique
+  createdAt     DateTime @default(now())
 }

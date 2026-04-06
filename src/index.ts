@@ -8,9 +8,8 @@ import { handleInteractions } from './handlers/interactions';
 import { erlcModeration } from './services/erlc';
 import { generatePrisonerCard } from './services/canvas';
 import { prisma } from './services/db';
-import { EmbedBuilder, AttachmentBuilder } from 'discord.js';
-import { PunishmentType } from '@prisma/client';
-import { startAuditLogPolling, handleAdminDM } from './services/auditLog';
+import { EmbedBuilder, AttachmentBuilder, TextChannel } from 'discord.js';
+import { startERLCPolling } from './services/erlcPoller';
 
 dotenv.config();
 
@@ -34,7 +33,6 @@ const rest = new REST({ version: '10' }).setToken(token);
 
 client.once(Events.ClientReady, async () => {
     console.log(`Bot logged in as ${client.user?.tag}`);
-    startAuditLogPolling(client);
 
     try {
         console.log('Started refreshing application (/) commands.');
@@ -53,6 +51,9 @@ client.once(Events.ClientReady, async () => {
     } catch (error) {
         console.error(error);
     }
+
+    // Start ERLC polling for in-game mod action detection
+    startERLCPolling(client);
 });
 
 client.on('interactionCreate', async interaction => {
@@ -86,19 +87,10 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
-client.on(Events.MessageCreate, async (message) => {
-    if (message.author.bot) return;
+client.on(Events.MessageCreate, async message => {
+    if (message.author.bot || !message.content.startsWith('!bb ')) return;
 
-    if (!message.guild) {
-        // Obsługa DM dla Adminów (Audit Logs)
-        await handleAdminDM(message);
-        return;
-    }
-
-    if (!message.content.startsWith('!bb ')) return;
-
-    const BAN_ROOM_ID = '1490073045002485991'; // Kanał z obrazkami "za kratami"
-    const KICK_LOG_ID = '1490303478965207181'; // Kanał dla kicków i logów akcji
+    const BAN_ROOM_ID = '1490303478965207181';
     const ADMIN_CHANNEL_ID = '1490274396391211158';
     const OWNER_ROLE_ID = '1490053669830393996';
 
@@ -132,8 +124,6 @@ client.on(Events.MessageCreate, async (message) => {
 
         const result = await erlcModeration.kick(nick, reason);
         if (result.success) {
-            const citizen = await prisma.citizen.findFirst({ where: { robloxNick: { equals: nick, mode: 'insensitive' } } });
-            
             const embed = new EmbedBuilder()
                 .setTitle('⚖️ Wyrzucenie z serwera')
                 .setColor('#f1c40f')
@@ -144,25 +134,8 @@ client.on(Events.MessageCreate, async (message) => {
                 )
                 .setTimestamp();
             
-            const kickLog = client.channels.cache.get(KICK_LOG_ID);
-            let sentMsgId: string | undefined;
-            if (kickLog?.isTextBased()) {
-                const sent = await (kickLog as any).send({ embeds: [embed] });
-                sentMsgId = sent.id;
-            }
-
-            if (citizen) {
-                await prisma.punishment.create({
-                    data: {
-                        citizenId: citizen.discordId,
-                        type: PunishmentType.KICK,
-                        reason,
-                        messageId: sentMsgId,
-                        isActive: false // Kick is instant, not "active" as a ban
-                    }
-                });
-            }
-
+            const banroom = client.channels.cache.get(BAN_ROOM_ID);
+            if (banroom?.isTextBased()) await (banroom as any).send({ embeds: [embed] });
             message.reply(`✅ Wyrzucono **${nick}** z serwera.`);
         } else {
             message.reply(`❌ Błąd: ${result.error}`);
@@ -204,30 +177,28 @@ client.on(Events.MessageCreate, async (message) => {
                 .setTimestamp();
 
             const banroom = client.channels.cache.get(BAN_ROOM_ID);
-            let sentMsgId: string | undefined;
             if (banroom?.isTextBased()) {
-                const sentNotification = await (banroom as any).send({ embeds: [embed], files: [attachment] });
-                sentMsgId = sentNotification.id;
-            }
-
-            if (citizen) {
-                await prisma.punishment.create({
+                const sentMsg = await (banroom as any).send({ embeds: [embed], files: [attachment] });
+                await (prisma as any).banLog.create({
                     data: {
-                        citizenId: citizen.discordId,
-                        type: PunishmentType.BAN,
+                        playerNick: nick,
+                        moderatorDiscordId: message.author.id,
+                        channelId: BAN_ROOM_ID,
+                        messageId: sentMsg.id,
                         reason,
-                        duration: `${timeH}h`,
-                        messageId: sentMsgId,
-                        isActive: true
+                        bannedUntil,
+                        isPermBan: false,
                     }
                 });
-
+            }
+            message.reply(`✅ Zbanowano **${nick}** na ${timeH}h.`);
+            
+            if (citizen) {
                 try {
                     const user = await client.users.fetch(citizen.discordId);
                     await user.send(`⚖️ Został na Ciebie nałożony **Ban tymczasowy** na serwerze Bielisko na okres **${timeH}h**.\nPowód: **${reason}**.\nKoniec kary: <t:${Math.floor(bannedUntil.getTime() / 1000)}:F>.`);
                 } catch(e) {}
             }
-            message.reply(`✅ Zbanowano **${nick}** na ${timeH}h.`);
         } else {
             message.reply(`❌ Błąd: ${result.error}`);
         }
@@ -264,29 +235,28 @@ client.on(Events.MessageCreate, async (message) => {
                 .setTimestamp();
 
             const banroom = client.channels.cache.get(BAN_ROOM_ID);
-            let sentMsgId: string | undefined;
             if (banroom?.isTextBased()) {
-                const sent = await (banroom as any).send({ embeds: [embed], files: [attachment] });
-                sentMsgId = sent.id;
-            }
-
-            if (citizen) {
-                await prisma.punishment.create({
+                const sentMsg = await (banroom as any).send({ embeds: [embed], files: [attachment] });
+                await (prisma as any).banLog.create({
                     data: {
-                        citizenId: citizen.discordId,
-                        type: PunishmentType.PERMBAN,
+                        playerNick: nick,
+                        moderatorDiscordId: message.author.id,
+                        channelId: BAN_ROOM_ID,
+                        messageId: sentMsg.id,
                         reason,
-                        messageId: sentMsgId,
-                        isActive: true
+                        bannedUntil: null,
+                        isPermBan: true,
                     }
                 });
+            }
+            message.reply(`✅ Zbanowano permanentnie **${nick}**.`);
 
+            if (citizen) {
                 try {
                     const user = await client.users.fetch(citizen.discordId);
                     await user.send(`🚫 Zostałeś skazany na **dożywocie** (permban) na serwerze Bielisko.\nPowód: **${reason}**.`);
                 } catch(e) {}
             }
-            message.reply(`✅ Zbanowano permanentnie **${nick}**.`);
         } else {
             message.reply(`❌ Błąd: ${result.error}`);
         }
@@ -301,52 +271,57 @@ client.on(Events.MessageCreate, async (message) => {
 
         if (result.success) {
             const citizen = await prisma.citizen.findFirst({ where: { robloxNick: { equals: nick, mode: 'insensitive' } } });
-            
-            const punishmentsToUpdate = citizen ? await prisma.punishment.findMany({
-                where: { citizenId: citizen.discordId, isActive: true }
-            }) : [];
-
             if (citizen) {
                 await prisma.citizen.update({ 
                     where: { discordId: citizen.discordId }, 
                     data: { isPermBanned: false, bannedUntil: null } 
                 });
-
-                await prisma.punishment.updateMany({
-                    where: { citizenId: citizen.discordId, isActive: true },
-                    data: { isActive: false, resolvedAt: new Date() }
-                });
             }
 
+            // Try to edit the original ban embed instead of sending a new message
             const banroom = client.channels.cache.get(BAN_ROOM_ID);
-            if (banroom?.isTextBased()) {
-                // Edytuj stare logi
-                for (const p of punishmentsToUpdate) {
-                    if (p.messageId) {
-                        try {
-                            const oldMsg = await (banroom as any).messages.fetch(p.messageId);
-                            if (oldMsg && oldMsg.embeds.length > 0) {
-                                const oldEmbed = EmbedBuilder.from(oldMsg.embeds[0]);
-                                oldEmbed.setTitle(oldMsg.embeds[0].title + ' 🔓 ODBANOWANO');
-                                oldEmbed.setColor('#2ecc71');
-                                await oldMsg.edit({ embeds: [oldEmbed] });
-                            }
-                        } catch (e) {
-                            console.error(`Nie udało się edytować wiadomości ${p.messageId}:`, e);
-                        }
-                    }
-                }
+            const banLog = await (prisma as any).banLog.findFirst({
+                where: { playerNick: { equals: nick, mode: 'insensitive' }, unbannedAt: null },
+                orderBy: { createdAt: 'desc' }
+            });
 
-                const embed = new EmbedBuilder()
+            if (banLog && banroom?.isTextBased()) {
+                try {
+                    const banMsg = await (banroom as any).messages.fetch(banLog.messageId);
+                    const originalEmbed = banMsg.embeds[0];
+                    const updatedEmbed = EmbedBuilder.from(originalEmbed)
+                        .setColor('#2ecc71')
+                        .addFields({
+                            name: '✅ ODBANOWANY',
+                            value: `<t:${Math.floor(Date.now() / 1000)}:R> • Moderator: ${message.author.tag}`,
+                            inline: false
+                        });
+                    await banMsg.edit({ embeds: [updatedEmbed] });
+                    await (prisma as any).banLog.update({
+                        where: { id: banLog.id },
+                        data: { unbannedAt: new Date(), unbanModDiscordId: message.author.id }
+                    });
+                } catch(e) {
+                    // Fallback: send new embed if original not found
+                    const fallbackEmbed = new EmbedBuilder()
+                        .setTitle('🔓 Uwolnienie / Odbanowanie')
+                        .setColor('#2ecc71')
+                        .addFields(
+                            { name: 'Gracz', value: nick, inline: true },
+                            { name: 'Moderator', value: message.author.tag, inline: true }
+                        ).setTimestamp();
+                    await (banroom as any).send({ embeds: [fallbackEmbed] });
+                }
+            } else if (banroom?.isTextBased()) {
+                // No BanLog found – send new embed
+                const newEmbed = new EmbedBuilder()
                     .setTitle('🔓 Uwolnienie / Odbanowanie')
                     .setColor('#2ecc71')
                     .addFields(
                         { name: 'Gracz', value: nick, inline: true },
                         { name: 'Moderator', value: message.author.tag, inline: true }
-                    )
-                    .setTimestamp();
-                
-                await (banroom as any).send({ embeds: [embed] });
+                    ).setTimestamp();
+                await (banroom as any).send({ embeds: [newEmbed] });
             }
 
             message.reply(`✅ Odbanowano **${nick}**.`);

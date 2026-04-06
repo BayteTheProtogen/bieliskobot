@@ -1,6 +1,42 @@
 import axios from 'axios';
 
+const ERLC_API_V1 = 'https://api.policeroleplay.community/v1/server';
 const ERLC_API_URL = 'https://api.policeroleplay.community/v2/server/command';
+
+function erlcHeaders() {
+    return { 'Server-Key': process.env.ERLC_SERVER_KEY || '' };
+}
+
+export interface ERLCCommandLog {
+    Player: string;    // "NickName:RobloxId"
+    Timestamp: number; // unix seconds
+    Command: string;   // ":ban Nick powód"
+}
+
+export interface ERLCBan {
+    PlayerId: string;  // PlayerName only
+}
+
+export async function getCommandLogs(): Promise<ERLCCommandLog[]> {
+    try {
+        const res = await axios.get(`${ERLC_API_V1}/commandlogs`, { headers: erlcHeaders() });
+        return Array.isArray(res.data) ? res.data : [];
+    } catch(e: any) {
+        console.error('[ERLC] getCommandLogs error:', e.response?.data || e.message);
+        return [];
+    }
+}
+
+export async function getBans(): Promise<Record<string, string>> {
+    try {
+        const res = await axios.get(`${ERLC_API_V1}/bans`, { headers: erlcHeaders() });
+        return res.data || {};
+    } catch(e: any) {
+        console.error('[ERLC] getBans error:', e.response?.data || e.message);
+        return {};
+    }
+}
+
 
 export async function executeERLCCommand(command: string) {
     const serverKey = process.env.ERLC_SERVER_KEY;
