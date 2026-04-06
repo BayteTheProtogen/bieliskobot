@@ -1,7 +1,8 @@
-import { Interaction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, AttachmentBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, UserSelectMenuInteraction } from 'discord.js';
+import { Interaction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, AttachmentBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, UserSelectMenuInteraction, MessageFlags } from 'discord.js';
 import { prisma } from '../services/db';
 import { generateIDCard, generateFineCard } from '../services/canvas';
 import { getAvatarBust, getUserInfo } from '../services/roblox';
+import { logBotDM } from '../services/dmLogger';
 
 export async function handleInteractions(interaction: Interaction) {
     if (interaction.isUserSelectMenu()) {
@@ -183,8 +184,11 @@ export async function handleInteractions(interaction: Interaction) {
                     const citizenUser = await interaction.client.users.fetch(pending.discordId);
                     if (citizenUser) {
                         try {
-                            await citizenUser.send({ content: '✅ Urząd zatwierdził Twoje podanie o aktualizację dowodu! Oto nowy dokument:', files: [attachment] });
-                        } catch(e) {}
+                            const sentMsg = await citizenUser.send({ content: '✅ Urząd zatwierdził Twoje podanie o aktualizację dowodu! Oto nowy dokument:', files: [attachment] });
+                            await logBotDM(interaction.client, pending.discordId, sentMsg, 'ID_CARD');
+                        } catch(e) {
+                            console.error('Failed to DM updated card:', e);
+                        }
                     }
 
                     try {
@@ -368,6 +372,42 @@ export async function handleInteractions(interaction: Interaction) {
                 if (recipientUser) await recipientUser.send(`💸 Otrzymałeś przelew w wysokości **${amount} zł** od obywatela **${sender.firstName} ${sender.lastName}**.`);
             } catch(e) {}
         }
+
+        if (customId.startsWith('delete_dm|')) {
+            const ADMIN_ID = '1490053669830393996';
+            const isOwner = interaction.user.id === ADMIN_ID || (interaction.member?.roles as any).cache.has(ADMIN_ID);
+            
+            if (!isOwner) {
+                return interaction.reply({ content: '🚫 Brak uprawnień do usuwania DMów innych użytkowników.', flags: [MessageFlags.Ephemeral] });
+            }
+
+            const parts = customId.split('|');
+            const targetUserId = parts[1];
+            const messageId = parts[2];
+
+            await interaction.deferUpdate();
+
+            try {
+                const targetUser = await interaction.client.users.fetch(targetUserId);
+                const dmChannel = await targetUser.createDM();
+                const dmMessage = await dmChannel.messages.fetch(messageId);
+                
+                if (dmMessage) {
+                    await dmMessage.delete();
+                    
+                    const oldEmbed = interaction.message.embeds[0];
+                    const newEmbed = EmbedBuilder.from(oldEmbed)
+                        .setTitle('🗑️ WIADOMOŚĆ USUNIĘTA Z DM')
+                        .setColor('#000000')
+                        .addFields({ name: 'Status', value: `Wiadomość została pomyślnie usunięta przez <@${interaction.user.id}>.` });
+
+                    await interaction.editReply({ embeds: [newEmbed], components: [], files: [] });
+                }
+            } catch (error) {
+                console.error('Delete DM error:', error);
+                await interaction.followUp({ content: '🚫 Nie udało się usunąć wiadomości. Możliwe, że została już usunięta lub użytkownik zablokował bota.', flags: [MessageFlags.Ephemeral] });
+            }
+        }
     } else if (interaction.isModalSubmit()) {
         if (interaction.customId.startsWith('admin_reason_modal_')) {
             const updateId = parseInt(interaction.customId.replace('admin_reason_modal_', ''), 10);
@@ -500,8 +540,13 @@ export async function handleInteractions(interaction: Interaction) {
             // Send to DM
             try {
                 const targetUser = await interaction.client.users.fetch(target.discordId);
-                if (targetUser) await targetUser.send({ content: `🔴 Otrzymałeś ${amount === 0 ? 'pouczenie' : 'mandat'} w świecie RP Bielisko.`, files: [attachment] });
-            } catch(e) {}
+                if (targetUser) {
+                    const sentMsg = await targetUser.send({ content: `🔴 Otrzymałeś ${amount === 0 ? 'pouczenie' : 'mandat'} w świecie RP Bielisko.`, files: [attachment] });
+                    await logBotDM(interaction.client, target.discordId, sentMsg, 'FINE');
+                }
+            } catch(e) {
+                console.error('Failed to DM fine:', e);
+            }
 
             await interaction.editReply({ content: '✅ Mandat został wystawiony i przesłany.' });
             return;
@@ -513,11 +558,26 @@ export async function handleInteractions(interaction: Interaction) {
             const robloxNick = parts[1];
             const action = parts[2] || 'create';
 
-            const firstName = interaction.fields.getTextInputValue('firstName');
-            const lastName = interaction.fields.getTextInputValue('lastName');
+            const firstName = interaction.fields.getTextInputValue('firstName').trim();
+            const lastName = interaction.fields.getTextInputValue('lastName').trim();
             const dob = interaction.fields.getTextInputValue('dob');
             const gender = interaction.fields.getTextInputValue('gender').toUpperCase();
             const citizenship = interaction.fields.getTextInputValue('citizenship');
+
+            // Walidacja znaków (tylko litery polskie i łacińskie + spacje)
+            const nameRegex = /^[A-Za-zĄĘÓŁŚĆŃŹŻąęółśćńźż\s]+$/;
+            if (!nameRegex.test(firstName) || !nameRegex.test(lastName)) {
+                await interaction.reply({ content: '🚫 Imię i nazwisko mogą zawierać tylko litery (w tym polskie znaki) oraz spacje.', ephemeral: true });
+                return;
+            }
+
+            // Walidacja spacji (max 3)
+            const firstNameSpaces = (firstName.match(/ /g) || []).length;
+            const lastNameSpaces = (lastName.match(/ /g) || []).length;
+            if (firstNameSpaces > 3 || lastNameSpaces > 3) {
+                await interaction.reply({ content: '🚫 Imię lub nazwisko zawiera zbyt wiele spacji! (Maksymalnie 3 spacje na pole).', ephemeral: true });
+                return;
+            }
 
             // Walidacja płci
             if (!['M', 'K', 'X', 'F'].includes(gender)) {
@@ -650,10 +710,11 @@ export async function handleInteractions(interaction: Interaction) {
                 // Try sending DM
                 let dmSent = true;
                 try {
-                    await interaction.user.send({
+                    const sentMsg = await interaction.user.send({
                         content: `Twój elektroniczny dowód osobisty został pomyślnie zapisany w systemie. Oto kopia:`,
                         files: [attachment]
                     });
+                    await logBotDM(interaction.client, interaction.user.id, sentMsg, 'ID_CARD');
                 } catch (e) {
                     dmSent = false; // User has DMs disabled
                 }
