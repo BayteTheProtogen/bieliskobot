@@ -95,12 +95,17 @@ client.on('interactionCreate', async interaction => {
             if (interaction.commandName === 'sklep') await sklepCommands.execute(interaction);
             if (interaction.commandName === 'ekwipunek') await ekwipunekCommands.execute(interaction);
             if (interaction.commandName === 'kasyno') await kasynoCommand.execute(interaction);
-        } else if (['mandat', 'areszt', 'kartoteka'].includes(interaction.commandName)) {
+        } else if (interaction.commandName === 'mandat') {
             if (interaction.channelId !== '1490365930818109490') {
-                await interaction.reply({ content: '🚫 Mandaty, areszty i kartotekę można sprawdzać wyłącznie na kanale <#1490365930818109490>!', ephemeral: true });
+                await interaction.reply({ content: '🚫 Mandaty można wypisywać wyłącznie na kanale <#1490365930818109490>!', ephemeral: true });
                 return;
             }
-            if (interaction.commandName === 'mandat') await mandatCommand.execute(interaction);
+            await mandatCommand.execute(interaction);
+        } else if (['areszt', 'kartoteka'].includes(interaction.commandName)) {
+            if (interaction.channelId !== '1490366000615526460') {
+                await interaction.reply({ content: '🚫 Areszty oraz kartotekę można sprawdzać wyłącznie na kanale <#1490366000615526460>!', ephemeral: true });
+                return;
+            }
             if (interaction.commandName === 'areszt') await aresztCommand.execute(interaction);
             if (interaction.commandName === 'kartoteka') await kartotekaCommand.execute(interaction);
         } else if (interaction.commandName === 'rejestracja') {
