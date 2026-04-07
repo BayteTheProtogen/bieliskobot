@@ -39,26 +39,32 @@ export async function detectVehicle(imageUrl: string): Promise<DetectionResult> 
 
     // 1. Load and Resize Image
     const img = await loadImage(imageUrl);
-    const canvas = createCanvas(640, 640);
+    const size = 320; // Model expects 320x320
+    const canvas = createCanvas(size, size);
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0, 640, 640);
-    const imageData = ctx.getImageData(0, 0, 640, 640);
+    ctx.drawImage(img, 0, 0, size, size);
+    const imageData = ctx.getImageData(0, 0, size, size);
 
-    // 2. Preprocess: [1, 3, 640, 640]
-    const float32Data = new Float32Array(3 * 640 * 640);
-    for (let i = 0; i < 640 * 640; i++) {
+    // 2. Preprocess: [1, 3, 320, 320]
+    const float32Data = new Float32Array(3 * size * size);
+    for (let i = 0; i < size * size; i++) {
         float32Data[i] = imageData.data[i * 4] / 255.0; // R
-        float32Data[i + 640 * 640] = imageData.data[i * 4 + 1] / 255.0; // G
-        float32Data[i + 2 * 640 * 640] = imageData.data[i * 4 + 2] / 255.0; // B
+        float32Data[i + size * size] = imageData.data[i * 4 + 1] / 255.0; // G
+        float32Data[i + 2 * size * size] = imageData.data[i * 4 + 2] / 255.0; // B
     }
 
-    const inputTensor = new ort.Tensor('float32', float32Data, [1, 3, 640, 640]);
+    const inputTensor = new ort.Tensor('float32', float32Data, [1, 3, size, size]);
 
     // 3. Inference
     const outputs = await session.run({ images: inputTensor });
-    const output = outputs['output0']; // Shape [1, 84, 8400]
+    const output = outputs['output0'] || outputs[Object.keys(outputs)[0]]; 
+    
+    // 4. Post-process
+    const data = output.data as Float32Array;
+    const shape = output.dims; // [1, 84, boxes]
+    const numDetections = shape[2];
+    const numClasses = shape[1];
 
-    // 4. Post-process (simplified: find max confidence for car/truck/etc)
     // Indices: 2-car, 3-motorcycle, 5-bus, 7-truck
     const vehicleIndices = [2, 3, 5, 7];
     const labels = { 2: 'Auto', 3: 'Motocykl', 5: 'Autobus', 7: 'Ciężarówka' };
@@ -66,13 +72,10 @@ export async function detectVehicle(imageUrl: string): Promise<DetectionResult> 
     let maxConf = 0;
     let bestLabel = 'Brak';
     
-    const data = output.data as Float32Array;
-    // output[0] has shape [84, 8400]
-    // data is flattened [84 * 8400]
-    
-    for (let i = 0; i < 8400; i++) {
+    for (let i = 0; i < numDetections; i++) {
         for (const idx of vehicleIndices) {
-            const conf = data[(4 + idx) * 8400 + i]; // 4 header values (x,y,w,h) + class index
+            // Index calculation: (class_idx + 4) * numDetections + i
+            const conf = data[(4 + idx) * numDetections + i];
             if (conf > maxConf) {
                 maxConf = conf;
                 bestLabel = (labels as any)[idx];
