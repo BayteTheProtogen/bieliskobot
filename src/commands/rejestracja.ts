@@ -70,7 +70,7 @@ export const rejestracjaCommand = {
                     
                     if (!aiResult.detected) {
                         return interaction.editReply({ 
-                            content: `❌ **AI nie rozpoznało pojazdu.**\nSystem twierdzi, że to prawdopodobnie: **${aiResult.label || 'Brak'}** (${aiResult.confidence}%).\n\nZrób screena pod innym kątem i spróbuj ponownie.` 
+                            content: `❌ **Nie byliśmy w stanie zweryfikować pojazdu.**\nWykonaj zrzut ekranu pod innym kątem (najlepiej w dzień, z bliska) i spróbuj ponownie.` 
                         });
                     }
 
@@ -112,11 +112,10 @@ export const rejestracjaCommand = {
                     });
 
                     const embed = new EmbedBuilder()
-                        .setTitle('🚗 Pojazd Zweryfikowany (AI)')
-                        .setDescription(`System rozpoznał: **${aiResult.label}**.\n\nKliknij przycisk poniżej, aby uzupełnić dane.`)
+                        .setTitle('🚗 Pojazd Zweryfikowany')
+                        .setDescription(`Kliknij przycisk poniżej, aby uzupełnić dane.`)
                         .setImage(finalImageUrl)
-                        .setColor('#2ecc71')
-                        .setFooter({ text: 'AI Vision System v1.1' });
+                        .setColor('#2ecc71');
 
                     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
                         new ButtonBuilder()
@@ -127,8 +126,8 @@ export const rejestracjaCommand = {
 
                     await interaction.editReply({ embeds: [embed], components: [row] });
                 } catch (aiErr) {
-                    console.error('AI Processing error:', aiErr);
-                    await interaction.editReply({ content: '❌ Błąd analizy zdjęcia.' });
+                    console.error('Processing error:', aiErr);
+                    await interaction.editReply({ content: '❌ Wystąpił błąd podczas weryfikacji zdjęcia.' });
                 }
                 return;
             }

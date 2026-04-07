@@ -17,14 +17,11 @@ export async function initVision() {
     }
 
     if (!fs.existsSync(MODEL_PATH)) {
-        console.log('Downloading YOLOv8n model... 📥');
         const response = await axios.get(MODEL_URL, { responseType: 'arraybuffer' });
         fs.writeFileSync(MODEL_PATH, Buffer.from(response.data));
-        console.log('Model downloaded! ✅');
     }
 
     session = await ort.InferenceSession.create(MODEL_PATH);
-    console.log('YOLOv8 session initialized! 🧠');
 }
 
 export interface DetectionResult {
@@ -102,44 +99,52 @@ export async function cropToVehicle(imageUrl: string, box: { x: number, y: numbe
     const origW = img.width;
     const origH = img.height;
 
-    // Scale box from 320 to original dimensions
-    const scale = origW / 320; // Assuming square model input mapping relative to width
-    const scaleY = origH / 320;
+    // 1. Map center and size from model (320x320 stretched) to original pixels
+    const cx = box.x * (origW / 320);
+    const cy = box.y * (origH / 320);
+    const bw = box.w * (origW / 320);
+    const bh = box.h * (origH / 320);
+
+    // 2. Add fixed 20% margin to the bounding box
+    const margin = 0.20;
+    let cw = bw * (1 + margin);
+    let ch = bh * (1 + margin);
+
+    // 3. Force Aspect Ratio 40:27 (approx 1.48) - matches generateVehicleCard
+    const targetAR = 400 / 270;
     
-    let cx = box.x * scale;
-    let cy = box.y * scaleY;
-    let cw = box.w * scale;
-    let ch = box.h * scaleY;
-
-    // Target Aspect Ratio 16:9
-    const targetAR = 16 / 9;
-    const margin = 0.25; // 25% margin
-
-    // Add margin
-    cw *= (1 + margin);
-    ch *= (1 + margin);
-
-    // If wider than target AR, expand height. If taller, expand width.
     if (cw / ch > targetAR) {
+        // Current box is wider than target AR, expand height to fit
         ch = cw / targetAR;
     } else {
+        // Current box is taller than target AR, expand width to fit
         cw = ch * targetAR;
     }
 
-    // Calculate crop rectangle
+    // 4. Calculate final crop rectangle (top-left)
     let x = cx - cw / 2;
     let y = cy - ch / 2;
 
-    // Clamp to image bounds
+    // 5. Clamp to bounds and adjust if necessary
     if (x < 0) x = 0;
     if (y < 0) y = 0;
-    if (x + cw > origW) cw = origW - x;
-    if (y + ch > origH) ch = origH - y;
+    if (x + cw > origW) {
+        cw = origW - x;
+        ch = cw / targetAR; // Maintain AR if we had to shrink width
+    }
+    if (y + ch > origH) {
+        ch = origH - y;
+        cw = ch * targetAR; // Maintain AR if we had to shrink height
+    }
 
-    // Create crop canvas
+    // 6. Create canvas for the crop (actual pixels, no stretching)
     const canvas = createCanvas(Math.round(cw), Math.round(ch));
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, x, y, cw, ch, 0, 0, cw, ch);
+    
+    // drawImage(source, sx, sy, sw, sh, dx, dy, dw, dh)
+    // sx, sy, sw, sh: source rectangle
+    // dx, dy, dw, dh: destination rectangle (same size = NO STRETCH)
+    ctx.drawImage(img, Math.round(x), Math.round(y), Math.round(cw), Math.round(ch), 0, 0, Math.round(cw), Math.round(ch));
 
     return canvas.toBuffer('image/png');
 }
