@@ -190,9 +190,9 @@ export async function handleInteractions(interaction: Interaction) {
             const { customId } = interaction;
             
             if (customId.startsWith('veh_form|')) {
-                const imageUrl = customId.replace('veh_form|', '');
+                const pendingId = customId.split('|')[1];
                 const modal = new ModalBuilder()
-                    .setCustomId(`veh_registration_modal|${imageUrl}`)
+                    .setCustomId(`veh_registration_modal|${pendingId}`)
                     .setTitle('Dane Pojazdu');
 
                 const brandInput = new TextInputBuilder()
@@ -913,7 +913,7 @@ export async function handleInteractions(interaction: Interaction) {
             const { customId } = interaction;
 
             if (customId.startsWith('veh_registration_modal|')) {
-                const imageUrl = customId.replace('veh_registration_modal|', '');
+                const pendingId = parseInt(customId.split('|')[1]);
                 const brand = interaction.fields.getTextInputValue('brand');
                 const model = interaction.fields.getTextInputValue('model');
 
@@ -923,6 +923,11 @@ export async function handleInteractions(interaction: Interaction) {
                     const citizen = await prisma.citizen.findUnique({ where: { discordId: interaction.user.id } });
                     if (!citizen) return interaction.editReply({ content: 'Błąd: Najpierw wyrób dowód osobisty!' });
 
+                    const pending = await (prisma as any).pendingVehicle.findUnique({ where: { id: pendingId } });
+                    if (!pending) return interaction.editReply({ content: '🚫 Nie znaleziono wniosku (mógł wygasnąć).' });
+
+                    const imageUrl = pending.imageUrl;
+
                     // YOLO DETECTION
                     const aiResult = await detectVehicle(imageUrl);
                     const aiEmoji = aiResult.detected ? '✅' : '❌';
@@ -930,14 +935,10 @@ export async function handleInteractions(interaction: Interaction) {
                         ? `Wykryto obiekt: **${aiResult.label}** (${aiResult.confidence}%)` 
                         : `**Nie wykryto pojazdu** (Pewność: ${aiResult.confidence}%)`;
 
-                    // Zapisujemy do PendingVehicle
-                    const pending = await (prisma as any).pendingVehicle.create({
-                        data: {
-                            ownerId: interaction.user.id,
-                            brand,
-                            model,
-                            imageUrl
-                        }
+                    // Zaktualizuj PendingVehicle o dane z modalu
+                    await (prisma as any).pendingVehicle.update({
+                        where: { id: pendingId },
+                        data: { brand, model }
                     });
 
                     const URZAD_CHANNEL_ID = '1490393894448271370';
@@ -958,11 +959,11 @@ export async function handleInteractions(interaction: Interaction) {
 
                         const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
                             new ButtonBuilder()
-                                .setCustomId(`urzad_reg_approve|${pending.id}`)
+                                .setCustomId(`urzad_reg_approve|${pendingId}`)
                                 .setLabel('Zatwierdź')
                                 .setStyle(ButtonStyle.Success),
                             new ButtonBuilder()
-                                .setCustomId(`urzad_reg_reject|${pending.id}`)
+                                .setCustomId(`urzad_reg_reject|${pendingId}`)
                                 .setLabel('Odrzuć')
                                 .setStyle(ButtonStyle.Danger)
                         );

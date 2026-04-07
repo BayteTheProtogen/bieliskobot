@@ -57,6 +57,14 @@ export const rejestracjaCommand = {
                     return interaction.reply({ content: '🚫 Musisz przesłać obrazek (screenshot) swojego auta!', ephemeral: true });
                 }
 
+                // Create a pending record to store the URL (Discord URLs are too long for customId)
+                const pending = await (prisma as any).pendingVehicle.create({
+                    data: {
+                        ownerId: interaction.user.id,
+                        imageUrl: attachment.url
+                    }
+                });
+
                 const embed = new EmbedBuilder()
                     .setTitle('🚗 Rejestracja Nowego Pojazdu')
                     .setDescription('Zdjęcie zostało zapisane. Teraz wprowadź markę i model pojazdu, aby dokończyć rejestrację.')
@@ -65,7 +73,7 @@ export const rejestracjaCommand = {
 
                 const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
                     new ButtonBuilder()
-                        .setCustomId(`veh_form|${attachment.url}`)
+                        .setCustomId(`veh_form|${pending.id}`)
                         .setLabel('Uzupełnij dane auta')
                         .setStyle(ButtonStyle.Primary)
                 );

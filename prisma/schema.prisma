@@ -116,8 +116,8 @@ model Vehicle {
 model PendingVehicle {
   id                 Int      @id @default(autoincrement())
   ownerId            String
-  brand              String
-  model              String
+  brand              String   @default("")
+  model              String   @default("")
   imageUrl           String
   createdAt          DateTime @default(now())
 }
