@@ -1,6 +1,6 @@
 import { Interaction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, AttachmentBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, UserSelectMenuInteraction, StringSelectMenuInteraction, StringSelectMenuBuilder, MessageFlags } from 'discord.js';
 import { prisma } from '../services/db';
-import { generateIDCard, generateFineCard } from '../services/canvas';
+import { generateIDCard, generateFineCard, generateArrestCard } from '../services/canvas';
 import { getAvatarBust, getUserInfo } from '../services/roblox';
 import { logBotDM } from '../services/dmLogger';
 import { getItemsByCategory, getItemById } from '../data/shopData';
@@ -961,6 +961,17 @@ export async function handleInteractions(interaction: Interaction) {
                         }
                     });
                 }
+                
+                // Zapis mandatu do logów historii kar
+                await prisma.fineLog.create({
+                    data: {
+                        citizenId: target.discordId,
+                        playerNick: target.robloxNick,
+                        officerDiscordId: interaction.user.id,
+                        reason: reason,
+                        amount: amount
+                    }
+                });
 
                 // Generate Image
                 const officerMember = await interaction.guild?.members.fetch(interaction.user.id);
@@ -998,6 +1009,69 @@ export async function handleInteractions(interaction: Interaction) {
                 }
 
                 await interaction.editReply({ content: '✅ Mandat został wystawiony i przesłany.' });
+                return;
+            }
+
+            if (interaction.customId === 'areszt_modal') {
+                const targetNick = interaction.fields.getTextInputValue('targetNick');
+                const reason = interaction.fields.getTextInputValue('reason');
+                const timeStr = interaction.fields.getTextInputValue('time');
+                const time = parseInt(timeStr, 10);
+
+                if (isNaN(time) || time <= 0) {
+                    return interaction.reply({ content: '🚫 Nieprawidłowy czas aresztu.', flags: [MessageFlags.Ephemeral] });
+                }
+
+                const target = await prisma.citizen.findFirst({ where: { robloxNick: { equals: targetNick, mode: 'insensitive' } } });
+                if (!target) {
+                    return interaction.reply({ content: `🚫 Nie znaleziono w bazie obywatela o nicku: **${targetNick}**.`, flags: [MessageFlags.Ephemeral] });
+                }
+
+                await interaction.reply({ content: 'Przygotowywanie dokumentacji osadzenia... 🚓', flags: [MessageFlags.Ephemeral] });
+
+                await prisma.arrestLog.create({
+                    data: {
+                        citizenId: target.discordId,
+                        playerNick: target.robloxNick,
+                        officerDiscordId: interaction.user.id,
+                        reason: reason,
+                        time: time
+                    }
+                });
+
+                const officerMember = await interaction.guild?.members.fetch(interaction.user.id);
+                const officerName = officerMember?.nickname || interaction.user.username;
+
+                const buffer = await generateArrestCard({
+                    targetName: `${target.firstName} ${target.lastName}`,
+                    targetNick: target.robloxNick,
+                    reason,
+                    time: `${time} miesięc(y)`,
+                    citizenNumber: target.citizenNumber,
+                    officerName,
+                    date: new Date().toLocaleString('pl-PL')
+                });
+
+                const attachment = new AttachmentBuilder(buffer, { name: 'areszt.png' });
+
+                if (interaction.channel && 'send' in interaction.channel) {
+                    await interaction.channel.send({
+                        content: `🚔 Obywatel <@${target.discordId}> został osadzony w areszcie na **${time} miesięcy**!`,
+                        files: [attachment]
+                    });
+                }
+
+                try {
+                    const targetUser = await interaction.client.users.fetch(target.discordId);
+                    if (targetUser) {
+                        const sentMsg = await targetUser.send({ content: `🚨 Zostałeś osadzony w areszcie na **${time} miesięcy** w świecie RP Bielisko.`, files: [attachment] });
+                        await logBotDM(interaction.client, target.discordId, sentMsg, 'ARREST');
+                    }
+                } catch(e) {
+                    console.error('Failed to DM arrest:', e);
+                }
+
+                await interaction.editReply({ content: '✅ Dokumentacja osadzenia wysłana.' });
                 return;
             }
 

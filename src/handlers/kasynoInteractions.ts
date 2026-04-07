@@ -165,10 +165,7 @@ async function playSlots(interaction: any, bet: number) {
         if (r1 === '💎') multiplier = 10;
         else if (r1 === '🎰') multiplier = 20;
         else multiplier = 3; // Owoce x3
-    } else if (r1 === r2 || r2 === r3 || r1 === r3) {
-        isWin = true;
-        multiplier = 1.5; // Dwa takie same symbole x1.5
-    }
+    } // Usunięto wygraną za 2 takie same symbole (x1.5)
 
     await interaction.editReply(`🎰 **Jednoręki Bandyta** \n[ ${r1} | ${r2} | ${r3} ]  **Koniec gry!**`);
     await delay(1000);
@@ -182,9 +179,20 @@ async function playCoinflip(interaction: any, bet: number, userChoice: string) {
     await interaction.editReply(`🪙 Moneta wiruje w powietrzu...`);
     await delay(1500);
 
-    const isHeads = Math.random() > 0.5;
-    const resultSide = isHeads ? 'heads' : 'tails';
-    const resultName = isHeads ? 'Orzeł' : 'Reszka';
+    const rand = Math.random();
+    let resultSide = '';
+    let resultName = '';
+
+    if (rand < 0.48) {
+        resultSide = userChoice; 
+        resultName = (userChoice === 'heads' ? 'Orzeł' : 'Reszka');
+    } else if (rand < 0.96) {
+        resultSide = (userChoice === 'heads' ? 'tails' : 'heads');
+        resultName = (resultSide === 'heads' ? 'Orzeł' : 'Reszka');
+    } else {
+        resultSide = 'edge';
+        resultName = 'Krawędź! 😲';
+    }
 
     await interaction.editReply(`💥 Wypada... **${resultName}**!`);
     await delay(1000);
@@ -203,13 +211,15 @@ async function playRoulette(interaction: any, bet: number, colorChoice: string) 
     let resultColor = '';
     let resultName = '';
 
-    // 0-47.3%: Red, 47.3-94.6%: Black, 94.6-100%: Green
-    if (rand < 0.473) {
+    // 0-46.5%: Red (46.5%), 46.5-93%: Black (46.5%), 93-96.5%: Green (3.5%), 96.5-100%: Dom (3.5%)
+    if (rand < 0.465) {
         resultColor = 'red'; resultName = 'Czerwony 🔴';
-    } else if (rand < 0.946) {
+    } else if (rand < 0.93) {
         resultColor = 'black'; resultName = 'Czarny ⚫';
-    } else {
+    } else if (rand < 0.965) {
         resultColor = 'green'; resultName = 'Zielony 🟩';
+    } else {
+        resultColor = 'house'; resultName = 'Przegrana (Zero/Marża) 💀';
     }
 
     await interaction.editReply(`💥 Kuleczka opada! Wynik: **${resultName}**`);

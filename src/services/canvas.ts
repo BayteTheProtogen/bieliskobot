@@ -631,3 +631,219 @@ export async function generateCasinoResult(user: any, isWin: boolean, outcomeLab
 
     return canvas.toBuffer('image/png');
 }
+
+export interface ArrestData {
+    targetName: string;
+    targetNick: string;
+    reason: string;
+    time: string;
+    citizenNumber: string;
+    officerName: string;
+    date: string;
+}
+
+export async function generateArrestCard(data: ArrestData): Promise<Buffer> {
+    const width = 600;
+    const height = 800;
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+
+    // Tło dokumentu więziennego
+    ctx.fillStyle = '#1c1f26';
+    ctx.fillRect(0, 0, width, height);
+
+    // Drobny szum/texture
+    ctx.fillStyle = 'rgba(255,255,255,0.02)';
+    for (let i = 0; i < width; i += 4) {
+        for (let j = 0; j < height; j += 4) {
+            if (Math.random() > 0.5) ctx.fillRect(i, j, 4, 4);
+        }
+    }
+
+    // Paski góra/dół (Ostrzegawcze)
+    ctx.fillStyle = '#c0392b';
+    ctx.fillRect(0, 0, width, 40);
+    ctx.fillRect(0, height - 40, width, 40);
+    
+    ctx.fillStyle = '#111';
+    for (let i = 0; i < width + 100; i += 40) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0); ctx.lineTo(i - 40, 40);
+        ctx.moveTo(i + 20, 0); ctx.lineTo(i - 20, 40);
+        ctx.stroke();
+    }
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 36px Roboto';
+    ctx.textAlign = 'center';
+    ctx.fillText('NAKAZ OSADZENIA', width / 2, 90);
+
+    const contentX = 50;
+    let currentY = 160;
+
+    const drawSection = (label: string, value: string) => {
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#7f8c8d';
+        ctx.font = 'bold 12px Roboto';
+        ctx.fillText(label.toUpperCase(), contentX, currentY);
+        
+        ctx.fillStyle = '#ecf0f1';
+        ctx.font = '22px RobotoBold';
+        ctx.fillText(value.toUpperCase(), contentX, currentY + 30);
+        currentY += 75;
+    };
+
+    drawSection('OSADZONY', `${data.targetName} (@${data.targetNick})`);
+    drawSection('NUMER CYWILNY', data.citizenNumber);
+    drawSection('WYMIAR KARY (CZAS)', data.time);
+    
+    // Powód
+    ctx.fillStyle = '#7f8c8d';
+    ctx.font = 'bold 12px Roboto';
+    ctx.fillText('ZASĄDZONY WYROK (POWÓD)', contentX, currentY);
+    ctx.fillStyle = '#e74c3c';
+    ctx.font = '18px Roboto';
+    
+    const words = data.reason.split(' ');
+    let line = '';
+    let reasonY = currentY + 30;
+    for (const word of words) {
+        const test = line + word + ' ';
+        if (ctx.measureText(test).width > width - 100) {
+            ctx.fillText(line, contentX, reasonY);
+            line = word + ' ';
+            reasonY += 24;
+        } else {
+            line = test;
+        }
+    }
+    ctx.fillText(line, contentX, reasonY);
+    currentY = reasonY + 70;
+
+    ctx.fillStyle = '#7f8c8d';
+    ctx.font = 'bold 12px Roboto';
+    ctx.fillText('FUNKCJONARIUSZ:', contentX, currentY);
+    ctx.fillStyle = '#bdc3c7';
+    ctx.font = '16px RobotoBold';
+    ctx.fillText(data.officerName.toUpperCase(), contentX, currentY + 25);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#7f8c8d';
+    ctx.font = 'bold 12px Roboto';
+    ctx.fillText('DATA ARESZTU:', width - contentX, currentY);
+    ctx.fillStyle = '#bdc3c7';
+    ctx.font = '16px RobotoBold';
+    ctx.fillText(data.date, width - contentX, currentY + 25);
+
+    // Proceduralny stempel w tle (ZAMKNIĘTY)
+    ctx.save();
+    ctx.translate(width / 2 + 50, height / 2 + 100);
+    ctx.rotate(-0.35);
+    ctx.strokeStyle = 'rgba(231, 76, 60, 0.4)';
+    ctx.lineWidth = 10;
+    ctx.strokeRect(-200, -60, 400, 120);
+    ctx.fillStyle = 'rgba(231, 76, 60, 0.4)';
+    ctx.font = 'bold 80px Roboto';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('ARESZT', 0, 0);
+    ctx.restore();
+
+    return canvas.toBuffer('image/png');
+}
+
+export interface KartotekaData {
+    targetName: string;
+    targetNick: string;
+    bans: number;
+    arrests: number;
+    fines: number;
+}
+
+export async function generateKartotekaCard(data: KartotekaData): Promise<Buffer> {
+    const width = 800;
+    const height = 450;
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+
+    // Tło kartoteki (teczka FBI manila folder)
+    ctx.fillStyle = '#e4c590';
+    ctx.fillRect(0, 0, width, height);
+    
+    // Efekt zagięcia teczki po lewej
+    ctx.fillStyle = 'rgba(0,0,0,0.05)';
+    ctx.fillRect(0, 0, 50, height);
+    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+    ctx.beginPath(); ctx.moveTo(50, 0); ctx.lineTo(50, height); ctx.stroke();
+
+    // Kartka z danymi (przypięta do teczki)
+    ctx.fillStyle = '#fdfdfd';
+    ctx.shadowColor = 'rgba(0,0,0,0.2)';
+    ctx.shadowBlur = 15;
+    ctx.shadowOffsetX = 5;
+    ctx.shadowOffsetY = 5;
+    ctx.fillRect(80, 40, width - 120, height - 80);
+    ctx.shadowColor = 'transparent';
+
+    // Spinacz (clip) na górze kartki
+    ctx.fillStyle = '#bdc3c7';
+    ctx.fillRect(width / 2 - 40, 20, 80, 30);
+    ctx.strokeStyle = '#7f8c8d';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(width / 2 - 40, 20, 80, 30);
+
+    // Treść na kartce
+    ctx.fillStyle = '#2c3e50';
+    ctx.font = 'bold 36px SpaceMono';
+    ctx.textAlign = 'center';
+    ctx.fillText('KARTOTEKA KRYMINALNA', width / 2, 100);
+    
+    ctx.strokeStyle = '#bdc3c7';
+    ctx.beginPath(); ctx.moveTo(width / 2 - 200, 115); ctx.lineTo(width / 2 + 200, 115); ctx.stroke();
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#7f8c8d';
+    ctx.font = 'bold 16px Roboto';
+    ctx.fillText('DANE OSOBOWE:', 120, 170);
+    ctx.fillStyle = '#2c3e50';
+    ctx.font = '26px RobotoBold';
+    ctx.fillText(`${data.targetName} (@${data.targetNick})`, 120, 205);
+
+    ctx.fillStyle = '#7f8c8d';
+    ctx.font = 'bold 16px Roboto';
+    ctx.fillText('REJESTR WYKROCZEŃ (HISTORYCZNY):', 120, 270);
+
+    // Kary - 3 sekcje
+    const drawsCount = (label: string, count: number, startX: number, color: string) => {
+        ctx.fillStyle = '#bdc3c7';
+        ctx.fillRect(startX, 300, 180, 80);
+        ctx.fillStyle = color;
+        ctx.font = 'bold 44px SpaceMono';
+        ctx.textAlign = 'center';
+        ctx.fillText(count.toString(), startX + 90, 345);
+        ctx.fillStyle = '#34495e';
+        ctx.font = 'bold 14px Roboto';
+        ctx.fillText(label, startX + 90, 370);
+        ctx.textAlign = 'left';
+    };
+
+    drawsCount('BANY / KICKI', data.bans, 120, '#e74c3c');
+    drawsCount('ARESZTOWANIA', data.arrests, 320, '#e67e22');
+    drawsCount('MANDATY', data.fines, 520, '#f1c40f');
+
+    // Pieczęć TOP SECRET
+    ctx.save();
+    ctx.translate(width - 150, 120);
+    ctx.rotate(0.2);
+    ctx.strokeStyle = '#c0392b';
+    ctx.lineWidth = 5;
+    ctx.strokeRect(-90, -30, 180, 60);
+    ctx.fillStyle = '#c0392b';
+    ctx.font = 'bold 32px SpaceMono';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('CONFIDENTIAL', 0, 0);
+    ctx.restore();
+
+    return canvas.toBuffer('image/png');
+}

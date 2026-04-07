@@ -6,7 +6,7 @@ export const DM_LOG_CHANNEL_ID = '1490640702135079042';
  * Logs a DM sent by the bot to a dedicated administrative channel.
  * Adds a button to allow admins to delete the original DM.
  */
-export async function logBotDM(client: Client, targetUserId: string, sentMessage: Message, type: 'ID_CARD' | 'FINE' | 'UNBAN') {
+export async function logBotDM(client: Client, targetUserId: string, sentMessage: Message, type: 'ID_CARD' | 'FINE' | 'UNBAN' | 'ARREST') {
     try {
         const logChannel = await client.channels.fetch(DM_LOG_CHANNEL_ID) as TextChannel;
         if (!logChannel || !logChannel.isTextBased()) return;

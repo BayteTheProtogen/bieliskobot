@@ -8,10 +8,12 @@ import { sklepCommands } from './commands/sklep';
 import { ekwipunekCommands } from './commands/ekwipunek';
 import { logiCommand } from './commands/logi';
 import { kasynoCommand } from './commands/kasyno';
+import { aresztCommand } from './commands/areszt';
+import { kartotekaCommand } from './commands/kartoteka';
 import { handleInteractions } from './handlers/interactions';
 import { handleKasynoInteractions } from './handlers/kasynoInteractions';
 import { erlcModeration } from './services/erlc';
-import { generatePrisonerCard } from './services/canvas';
+import { generatePrisonerCard, generateArrestCard, generateKartotekaCard } from './services/canvas';
 import { prisma } from './services/db';
 import { EmbedBuilder, AttachmentBuilder, TextChannel, ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
 import { startERLCPolling } from './services/erlcPoller';
@@ -56,7 +58,9 @@ client.once(Events.ClientReady, async () => {
                 sklepCommands.data.toJSON(),
                 ekwipunekCommands.data.toJSON(),
                 logiCommand.data.toJSON(),
-                kasynoCommand.data.toJSON()
+                kasynoCommand.data.toJSON(),
+                aresztCommand.data.toJSON(),
+                kartotekaCommand.data.toJSON()
             ] },
         );
         console.log('Successfully reloaded application (/) commands.');
@@ -77,8 +81,8 @@ client.on('interactionCreate', async interaction => {
             }
             await dowodCommand.execute(interaction);
         } else if (['portfel', 'praca', 'dorobka', 'sklep', 'ekwipunek', 'kasyno'].includes(interaction.commandName)) {
-            if (interaction.channelId !== '1490011312669855904') {
-                await interaction.reply({ content: '🚫 Komendy ekonomii, sklepu, pracy oraz kasyna są dozwolone wyłącznie na kanale <#1490011312669855904>!', ephemeral: true });
+            if (interaction.channelId !== '1490011537199595773') {
+                await interaction.reply({ content: '🚫 Komendy ekonomii, sklepu, pracy oraz kasyna są dozwolone wyłącznie na kanale <#1490011537199595773>!', ephemeral: true });
                 return;
             }
             if (interaction.commandName === 'portfel') await economyCommands.execute(interaction);
@@ -87,12 +91,14 @@ client.on('interactionCreate', async interaction => {
             if (interaction.commandName === 'sklep') await sklepCommands.execute(interaction);
             if (interaction.commandName === 'ekwipunek') await ekwipunekCommands.execute(interaction);
             if (interaction.commandName === 'kasyno') await kasynoCommand.execute(interaction);
-        } else if (interaction.commandName === 'mandat') {
+        } else if (['mandat', 'areszt', 'kartoteka'].includes(interaction.commandName)) {
             if (interaction.channelId !== '1490365930818109490') {
-                await interaction.reply({ content: '🚫 Mandaty można wystawiać wyłącznie na kanale <#1490365930818109490>!', ephemeral: true });
+                await interaction.reply({ content: '🚫 Mandaty, areszty i kartotekę można sprawdzać wyłącznie na kanale <#1490365930818109490>!', ephemeral: true });
                 return;
             }
-            await mandatCommand.execute(interaction);
+            if (interaction.commandName === 'mandat') await mandatCommand.execute(interaction);
+            if (interaction.commandName === 'areszt') await aresztCommand.execute(interaction);
+            if (interaction.commandName === 'kartoteka') await kartotekaCommand.execute(interaction);
         } else if (interaction.commandName === 'eco-admin') {
             await economyAdminCommands.execute(interaction);
         } else if (interaction.commandName === 'logi') {

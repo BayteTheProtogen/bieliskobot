@@ -78,3 +78,23 @@ model Inventory {
 
   @@index([discordId])
 }
+
+model FineLog {
+  id                 String   @id @default(cuid())
+  citizenId          String
+  playerNick         String
+  officerDiscordId   String
+  reason             String
+  amount             Int
+  createdAt          DateTime @default(now())
+}
+
+model ArrestLog {
+  id                 String   @id @default(cuid())
+  citizenId          String
+  playerNick         String
+  officerDiscordId   String
+  reason             String
+  time               Int      // e.g. minutes or months
+  createdAt          DateTime @default(now())
+}
