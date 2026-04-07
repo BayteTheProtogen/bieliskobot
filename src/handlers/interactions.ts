@@ -955,15 +955,17 @@ export async function handleInteractions(interaction: Interaction) {
                     if (urzadChannel && urzadChannel.isTextBased()) {
                         const aiEmoji = pending.aiConfidence > 40 ? '✅' : '⚠️';
                         const embed = new EmbedBuilder()
-                            .setTitle('🚗 Nowy Wniosek o Rejestrację')
-                            .setDescription(`Obywatel <@${interaction.user.id}> przesyła wniosek do rozpatrzenia.`)
+                            .setTitle('🏛️ Wniosek o Rejestrację Pojazdu')
+                            .setThumbnail(interaction.user.displayAvatarURL())
+                            .setDescription(`Obywatel <@${interaction.user.id}> prosi o zatwierdzenie ewidencji nowego pojazdu.`)
                             .addFields(
-                                { name: 'Pojazd', value: `**${brand} ${model}**`, inline: true },
-                                { name: 'Właściciel', value: `${citizen.firstName} ${citizen.lastName}`, inline: true },
-                                { name: 'AI Vision Check', value: `${aiEmoji} **${pending.aiLabel}** (${pending.aiConfidence}%)`, inline: false }
+                                { name: '📌 Dane Pojazdu', value: `Model: **${brand} ${model}**`, inline: true },
+                                { name: '🆔 Właściciel', value: `**${citizen.firstName} ${citizen.lastName}**`, inline: true },
+                                { name: '🤖 Weryfikacja AI', value: `Status: **${aiEmoji} ${pending.aiLabel}**\nPewność: \`${pending.aiConfidence}%\``, inline: false }
                             )
                             .setImage(imageUrl)
-                            .setColor(pending.aiConfidence > 40 ? '#2ecc71' : '#e67e22')
+                            .setColor(pending.aiConfidence > 40 ? '#00b894' : '#fdcb6e')
+                            .setFooter({ text: 'Workflow Urzędu Miasta Bielisko', iconURL: interaction.guild?.iconURL() || undefined })
                             .setTimestamp();
 
                         const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -997,7 +999,13 @@ export async function handleInteractions(interaction: Interaction) {
                 const newModel = interaction.fields.getTextInputValue('model');
 
                 try {
-                    await interaction.reply({ content: '✅ Twoja prośba o korektę została wysłana do Urzędu.', ephemeral: true });
+                    const embed = new EmbedBuilder()
+                        .setTitle('📝 Złożono Prośbę o Korektę')
+                        .setDescription(`Twoja prośba o zmianę danych dla pojazdu **${plate}** została przekazana do Urzędu.\nUrzędnik skontaktuje się z Tobą po rozpatrzeniu sprawy.`)
+                        .setColor('#0984e3')
+                        .setFooter({ text: 'Biuro Ewidencji Pojazdów' });
+
+                    await interaction.reply({ embeds: [embed], ephemeral: true });
 
                     const URZAD_CHANNEL_ID = '1490393894448271370';
                     const channel = await interaction.client.channels.fetch(URZAD_CHANNEL_ID);

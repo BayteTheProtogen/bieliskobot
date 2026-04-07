@@ -858,132 +858,170 @@ export interface VehicleCardData {
 }
 
 export async function generateVehicleCard(data: VehicleCardData): Promise<Buffer> {
-    const width = 800;
-    const height = 500;
+    const width = 850;
+    const height = 540;
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
 
-    // 1. TŁO - Klasyczny żółto-beżowy dokument (Dowód Rejestracyjny)
-    const baseGrad = ctx.createLinearGradient(0, 0, width, height);
-    baseGrad.addColorStop(0, '#fffbe6');
-    baseGrad.addColorStop(0.5, '#fdf5e6');
-    baseGrad.addColorStop(1, '#f5e6cc');
-    ctx.fillStyle = baseGrad;
+    // 1. TŁO - Nowoczesny Dowód Rejestracyjny (Bogata tekstura)
+    const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+    bgGrad.addColorStop(0, '#fef9c3'); // Jasny żółty
+    bgGrad.addColorStop(0.5, '#fefce8');
+    bgGrad.addColorStop(1, '#fde68a');
+    ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, width, height);
 
-    // 2. PROCEDURALNE WZORY (Gilosz bezpieczeństwa)
-    ctx.strokeStyle = 'rgba(139, 69, 19, 0.04)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < width; i += 20) {
-        ctx.beginPath(); ctx.arc(i, 250, 400, 0, Math.PI * 2); ctx.stroke();
+    // 2. PROCEDURALNY GILOSZ (Bezpieczeństwo)
+    ctx.save();
+    ctx.strokeStyle = 'rgba(120, 53, 15, 0.05)';
+    ctx.lineWidth = 0.5;
+    for (let i = -200; i < width + 200; i += 20) {
+        ctx.beginPath();
+        for (let j = 0; j < height; j += 5) {
+            const x = i + Math.sin(j * 0.02) * 30 + Math.cos(i * 0.01) * 20;
+            ctx.lineTo(x, j);
+        }
+        ctx.stroke();
     }
+    ctx.restore();
 
-    // 3. NAGŁÓWEK (Orzeł i Napisy)
-    ctx.fillStyle = '#1c1c1c';
-    ctx.font = 'bold 32px Roboto';
+    // 3. NAGŁÓWEK
+    ctx.fillStyle = '#451a03';
+    ctx.font = 'bold 36px Roboto';
     ctx.textAlign = 'center';
-    ctx.fillText('DOWÓD REJESTRACYJNY', width / 2, 60);
+    ctx.fillText('DOWÓD REJESTRACYJNY', width / 2, 65);
     
-    ctx.font = '14px Roboto';
-    ctx.fillStyle = '#4a4a4a';
-    ctx.fillText('RZECZPOSPOLITA POLSKA / REPUBLIC OF POLAND', width / 2, 85);
+    ctx.font = '14px RobotoBold';
+    ctx.fillStyle = '#92400e';
+    ctx.fillText('RZECZPOSPOLITA POLSKA • BIELISKO', width / 2, 95);
 
-    // 4. TABLICA REJESTRACYJNA (Renderowana jako element fizyczny)
-    const plateX = width / 2 - 150;
-    const plateY = 110;
-    const plateWidth = 300;
-    const plateHeight = 70;
+    // 4. TABLICA REJESTRACYJNA (3D LOOK)
+    const plateX = 40;
+    const plateY = 130;
+    const plateW = 340;
+    const plateH = 75;
 
     // Cień tablicy
-    ctx.fillStyle = 'rgba(0,0,0,0.1)';
-    ctx.fillRect(plateX + 4, plateY + 4, plateWidth, plateHeight);
-    
-    // Tło tablicy
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(plateX, plateY, plateWidth, plateHeight);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(plateX, plateY, plateWidth, plateHeight);
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.2)';
+    ctx.shadowBlur = 15;
+    ctx.shadowOffsetX = 5;
+    ctx.shadowOffsetY = 8;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.roundRect(plateX, plateY, plateW, plateH, 8);
+    ctx.fill();
+    ctx.restore();
 
-    // Pasek unijny na tablicy
+    // Pasek unijny (PL)
     ctx.fillStyle = '#003399';
-    ctx.fillRect(plateX, plateY, 40, plateHeight);
-    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.roundRect(plateX, plateY, 45, plateH, [8, 0, 0, 8]);
+    ctx.fill();
+    
+    ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 12px Roboto';
-    ctx.fillText('PL', plateX + 20, plateY + plateHeight - 15);
-    // Gwiazdki (proste kropki)
+    ctx.fillText('PL', plateX + 22, plateY + plateH - 12);
+    // Gwiazdki
     for (let i = 0; i < 12; i++) {
         const ang = (i * Math.PI * 2) / 12;
-        ctx.fillRect(plateX + 20 + Math.cos(ang) * 8, plateY + 25 + Math.sin(ang) * 8, 2, 2);
+        ctx.fillRect(plateX + 22 + Math.cos(ang) * 9, plateY + 25 + Math.sin(ang) * 9, 2, 2);
     }
 
-    // Numer na tablicy
-    ctx.fillStyle = '#000000';
-    ctx.font = 'bold 42px SpaceMono';
+    // Numer na tablicy (Wygląd tłoczenia)
+    ctx.fillStyle = '#111';
+    ctx.font = 'bold 48px SpaceMono';
     ctx.textAlign = 'center';
-    ctx.fillText(data.plate.toUpperCase(), plateX + (plateWidth + 40) / 2, plateY + 50);
-
-    // 5. ZDJĘCIE AUTA (Główny punkt dowodu)
-    const imgX = 50;
-    const imgY = 200;
-    const imgW = 350;
-    const imgH = 240;
-
-    // Ramka zdjęcia
-    ctx.fillStyle = '#FFFFFF';
-    ctx.shadowColor = 'rgba(0,0,0,0.2)';
-    ctx.shadowBlur = 10;
-    ctx.fillRect(imgX - 10, imgY - 10, imgW + 20, imgH + 20);
+    ctx.shadowColor = 'rgba(255,255,255,0.5)';
+    ctx.shadowOffsetX = 1;
+    ctx.shadowOffsetY = 1;
+    ctx.fillText(data.plate.toUpperCase(), plateX + (plateW + 45) / 2, plateY + 55);
     ctx.shadowColor = 'transparent';
 
+    // 5. ZDJĘCIE AUTA (Główna ekspozycja)
+    const imgX = 40;
+    const imgY = 230;
+    const imgW = 400;
+    const imgH = 270;
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.15)';
+    ctx.shadowBlur = 20;
+    ctx.shadowOffsetY = 10;
+    
+    ctx.beginPath();
+    ctx.roundRect(imgX, imgY, imgW, imgH, 15);
+    ctx.clip();
+    
     try {
         const carImg = await loadImage(data.carImageUrl);
         ctx.drawImage(carImg, imgX, imgY, imgW, imgH);
     } catch (e) {
-        // Placeholder jeśli obrazek nie załaduje się
-        ctx.fillStyle = '#e2e8f0';
+        ctx.fillStyle = '#d1d5db';
         ctx.fillRect(imgX, imgY, imgW, imgH);
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = 'bold 20px Roboto';
-        ctx.textAlign = 'center';
-        ctx.fillText('FOTOGRAFIA POJAZDU', imgX + imgW / 2, imgY + imgH / 2);
     }
+    ctx.restore();
 
-    // 6. DANE POJAZDU I WŁAŚCICIELA
-    const infoX = 440;
-    let infoY = 220;
+    // 6. DANE POJAZDU (Prawa kolumna)
+    const infoX = 480;
+    let infoY = 160;
 
-    const drawLine = (label: string, value: string) => {
+    const drawInfoField = (label: string, value: string, icon: string) => {
         ctx.textAlign = 'left';
-        ctx.fillStyle = '#78350f';
-        ctx.font = 'bold 12px Roboto';
-        ctx.fillText(label.toUpperCase(), infoX, infoY);
+        ctx.fillStyle = '#92400e';
+        ctx.font = '11px RobotoBold';
+        ctx.fillText(`${icon} ${label.toUpperCase()}`, infoX, infoY);
         
-        ctx.fillStyle = '#1c1c1c';
-        ctx.font = '22px RobotoBold';
-        ctx.fillText(value.toUpperCase(), infoX, infoY + 30);
-        infoY += 70;
+        ctx.fillStyle = '#451a03';
+        ctx.font = '24px RobotoBold';
+        ctx.fillText(value.toUpperCase(), infoX, infoY + 32);
+        
+        ctx.strokeStyle = 'rgba(146, 64, 14, 0.15)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(infoX, infoY + 50);
+        ctx.lineTo(width - 40, infoY + 50);
+        ctx.stroke();
+        
+        infoY += 85;
     };
 
-    drawLine('WŁAŚCICIEL (A)', data.ownerName);
-    drawLine('MARKA / MODEL (D.1/D.3)', `${data.brand} ${data.model}`);
-    drawLine('DATA WYDANIA (B)', data.issuedAt);
+    drawInfoField('Właściciel pojazdu (A)', data.ownerName, '👤');
+    drawInfoField('Marka i Model (D.1/D.3)', `${data.brand} ${data.model}`, '🚘');
+    drawInfoField('Data Pierwszej Rejestracji (B)', data.issuedAt, '📅');
 
-    // 7. PIECZĘĆ URZĘDOWA (Hologram / Stempel)
+    // 7. HOLOGRAM I PIECZĘĆ
     ctx.save();
-    ctx.translate(width - 120, height - 100);
-    ctx.rotate(-0.2);
-    ctx.strokeStyle = 'rgba(192, 57, 43, 0.6)';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(-80, -40, 160, 80);
-    ctx.fillStyle = 'rgba(192, 57, 43, 0.6)';
-    ctx.font = 'bold 18px Roboto';
+    ctx.translate(width - 120, height - 120);
+    ctx.rotate(-0.1);
+    ctx.globalAlpha = 0.6;
+    
+    // Zewnętrzny okrąg stempla
+    ctx.strokeStyle = '#991b1b';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, 70, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    ctx.fillStyle = '#991b1b';
+    ctx.font = 'bold 12px Roboto';
     ctx.textAlign = 'center';
-    ctx.fillText('URZĄD MIEJSKI', 0, -10);
-    ctx.fillText('BIELISKO', 0, 15);
-    ctx.font = '10px Roboto';
-    ctx.fillText('DO UŻYTKU RP', 0, 30);
+    ctx.fillText('URZĄD KOMUNIKACJI', 0, -45);
+    ctx.fillText('BIELISKO RP', 0, 50);
+    
+    ctx.font = 'bold 40px Roboto';
+    ctx.fillText('RP', 0, 15);
     ctx.restore();
+
+    // 8. MRZ (Dół karty)
+    const mrzY = height - 60;
+    ctx.fillStyle = 'rgba(69, 26, 3, 0.05)';
+    ctx.fillRect(40, mrzY, width - 80, 45);
+    
+    ctx.fillStyle = '#78350f';
+    ctx.font = '16px SpaceMono';
+    ctx.textAlign = 'center';
+    ctx.fillText(`P<POL${data.plate.replace(' ', '<')}<<<<<<<<<<<<<<<<<<`, width / 2, mrzY + 30);
 
     return canvas.toBuffer('image/png');
 }
