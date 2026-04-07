@@ -79,8 +79,9 @@ client.once(Events.ClientReady, async () => {
 client.on('interactionCreate', async interaction => {
     if (interaction.isChatInputCommand()) {
         if (interaction.commandName === 'dowod') {
-            if (interaction.channelId !== '1490011932068024370') {
-                await interaction.reply({ content: '🚫 Tej komendy można używać wyłącznie zgłaszając się na kanale <#1490011932068024370>!', ephemeral: true });
+            const allowedChannels = ['1490011932068024370', '1491082576130216037'];
+            if (!allowedChannels.includes(interaction.channelId)) {
+                await interaction.reply({ content: '🚫 Tej komendy można używać wyłącznie na kanale <#1490011932068024370> lub <#1491082576130216037>!', ephemeral: true });
                 return;
             }
             await dowodCommand.execute(interaction);
