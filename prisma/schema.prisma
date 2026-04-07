@@ -112,3 +112,12 @@ model Vehicle {
   @@index([ownerId])
   @@index([plate])
 }
+
+model PendingVehicle {
+  id                 Int      @id @default(autoincrement())
+  ownerId            String
+  brand              String
+  model              String
+  imageUrl           String
+  createdAt          DateTime @default(now())
+}

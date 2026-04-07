@@ -42,12 +42,12 @@ export const dowodCommand = {
 
         if (subcommand === 'pokaz') {
             const ownerId = '1490053669830393996';
-            const leoRoleId = '1490253667910029412';
-            const isAuthorized = interaction.user.id === ownerId || 
-                                (interaction.member?.roles && !Array.isArray(interaction.member.roles) && 
-                                (interaction.member.roles.cache.has(ownerId) || interaction.member.roles.cache.has(leoRoleId)));
+            const POLICJA_ROLE = '1490253667910029412';
+            const isOwner = interaction.user.id === ownerId || 
+                            (interaction.member?.roles as any).cache.has(ownerId) ||
+                            (interaction.member?.roles as any).cache.has(POLICJA_ROLE);
 
-            if (isAuthorized) {
+            if (isOwner) {
                 const select = new UserSelectMenuBuilder()
                     .setCustomId('admin_select_pokaz')
                     .setPlaceholder('Wybierz osobę, której chcesz podejrzeć dowód')

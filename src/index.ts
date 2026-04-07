@@ -15,6 +15,7 @@ import { handleKasynoInteractions } from './handlers/kasynoInteractions';
 import { rejestracjaCommand } from './commands/rejestracja';
 import { rejestracjaAdminCommands } from './commands/rejestracjaAdmin';
 import { erlcModeration } from './services/erlc';
+import { initVision } from './services/vision';
 import { generatePrisonerCard, generateArrestCard, generateKartotekaCard } from './services/canvas';
 import { prisma } from './services/db';
 import { EmbedBuilder, AttachmentBuilder, TextChannel, ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
@@ -45,6 +46,13 @@ const rest = new REST({ version: '10' }).setToken(token);
 
 client.once(Events.ClientReady, async () => {
     console.log(`Bot logged in as ${client.user?.tag}`);
+
+    // Init AI Vision
+    try {
+        await initVision();
+    } catch (e) {
+        console.error('Failed to init AI Vision:', e);
+    }
 
     try {
         console.log('Started refreshing application (/) commands.');
@@ -77,14 +85,31 @@ client.once(Events.ClientReady, async () => {
 });
 
 client.on('interactionCreate', async interaction => {
+    const POLICJA_CHANNEL = '1491082576130216037';
+    const POLICJA_ROLE = '1490253667910029412';
+
     if (interaction.isChatInputCommand()) {
         if (interaction.commandName === 'dowod') {
-            const allowedChannels = ['1490011932068024370', '1491082576130216037'];
-            if (!allowedChannels.includes(interaction.channelId)) {
-                await interaction.reply({ content: '🚫 Tej komendy można używać wyłącznie na kanale <#1490011932068024370> lub <#1491082576130216037>!', ephemeral: true });
+            const memberRoles = interaction.member?.roles;
+            const isPolicja = interaction.channelId === POLICJA_CHANNEL && 
+                              memberRoles && 
+                              'cache' in memberRoles && 
+                              (memberRoles as any).cache.has(POLICJA_ROLE);
+
+            if (interaction.channelId !== '1490011932068024370' && !isPolicja) {
+                await interaction.reply({ content: '🚫 Tej komendy można używać wyłącznie na kanale <#1490011932068024370> lub przez Policję na ich kanale!', ephemeral: true });
                 return;
             }
-            await dowodCommand.execute(interaction);
+            try {
+                await dowodCommand.execute(interaction);
+            } catch (err) {
+                console.error('Error executing dowodCommand:', err);
+                if (interaction.deferred || interaction.replied) {
+                    await interaction.editReply({ content: '❌ Wystąpił błąd podczas wykonywania tej komendy.' });
+                } else {
+                    await interaction.reply({ content: '❌ Wystąpił błąd podczas wykonywania tej komendy.', ephemeral: true });
+                }
+            }
         } else if (['portfel', 'praca', 'dorobka', 'sklep', 'ekwipunek', 'kasyno'].includes(interaction.commandName)) {
             if (interaction.channelId !== '1490011537199595773') {
                 await interaction.reply({ content: '🚫 Komendy ekonomii, sklepu, pracy oraz kasyna są dozwolone wyłącznie na kanale <#1490011537199595773>!', ephemeral: true });
@@ -101,20 +126,45 @@ client.on('interactionCreate', async interaction => {
                 await interaction.reply({ content: '🚫 Mandaty można wypisywać wyłącznie na kanale <#1490365930818109490>!', ephemeral: true });
                 return;
             }
-            await mandatCommand.execute(interaction);
+            try {
+                await mandatCommand.execute(interaction);
+            } catch (err) {
+                console.error('Error executing mandatCommand:', err);
+                if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: '❌ Wystąpił błąd podczas wystawiania mandatu.', ephemeral: true });
+            }
         } else if (['areszt', 'kartoteka'].includes(interaction.commandName)) {
             if (interaction.channelId !== '1490366000615526460') {
                 await interaction.reply({ content: '🚫 Areszty oraz kartotekę można sprawdzać wyłącznie na kanale <#1490366000615526460>!', ephemeral: true });
                 return;
             }
-            if (interaction.commandName === 'areszt') await aresztCommand.execute(interaction);
-            if (interaction.commandName === 'kartoteka') await kartotekaCommand.execute(interaction);
+            try {
+                if (interaction.commandName === 'areszt') await aresztCommand.execute(interaction);
+                if (interaction.commandName === 'kartoteka') await kartotekaCommand.execute(interaction);
+            } catch (err) {
+                console.error('Error executing arrest/kartoteka:', err);
+                if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: '❌ Wystąpił błąd podczas przetwarzania wyroku.', ephemeral: true });
+            }
         } else if (interaction.commandName === 'rejestracja') {
-            if (interaction.channelId !== '1490012050888593439') {
-                await interaction.reply({ content: '🚫 Rejestrację pojazdów można przeprowadzić wyłącznie na kanale <#1490012050888593439>!', ephemeral: true });
+            const memberRoles = interaction.member?.roles;
+            const isPolicja = interaction.channelId === POLICJA_CHANNEL && 
+                              memberRoles && 
+                              'cache' in memberRoles && 
+                              (memberRoles as any).cache.has(POLICJA_ROLE);
+
+            if (interaction.channelId !== '1490012050888593439' && !isPolicja) {
+                await interaction.reply({ content: '🚫 Rejestrację pojazdów można przeprowadzić wyłącznie na kanale <#1490012050888593439> lub przez Policję na ich kanale!', ephemeral: true });
                 return;
             }
-            await rejestracjaCommand.execute(interaction);
+            try {
+                await rejestracjaCommand.execute(interaction);
+            } catch (err) {
+                console.error('Error executing rejestracjaCommand:', err);
+                if (interaction.deferred || interaction.replied) {
+                    await interaction.editReply({ content: '❌ Wystąpił błąd podczas wykonywania tej komendy.' });
+                } else {
+                    await interaction.reply({ content: '❌ Wystąpił błąd podczas wykonywania tej komendy.', ephemeral: true });
+                }
+            }
         } else if (interaction.commandName === 'ra-pojazd') {
             await rejestracjaAdminCommands.execute(interaction);
         } else if (interaction.commandName === 'eco-admin') {
