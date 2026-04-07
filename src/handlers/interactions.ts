@@ -304,6 +304,67 @@ export async function handleInteractions(interaction: Interaction) {
                 return;
             }
 
+            if (customId.startsWith('admin_veh_panel|')) {
+                const plate = customId.split('|')[1];
+                const vehicle = await (prisma as any).vehicle.findUnique({ where: { plate } });
+                if (!vehicle) return interaction.reply({ content: '🚫 Nie znaleziono pojazdu.', ephemeral: true });
+
+                const embed = new EmbedBuilder()
+                    .setTitle(`⚙️ Zarządzanie: ${vehicle.brand} ${vehicle.model}`)
+                    .setDescription(`Panel administracyjny dla tablicy **${vehicle.plate}**`)
+                    .addFields(
+                        { name: '👤 Właściciel', value: `**${vehicle.ownerName}** (<@${vehicle.ownerId}>)`, inline: true },
+                        { name: '📅 Zarejestrowano', value: vehicle.createdAt.toLocaleDateString('pl-PL'), inline: true },
+                        { name: '🖼️ Zdjęcie', value: vehicle.imageUrl ? '[Otwórz zdjęcie](' + vehicle.imageUrl + ')' : '❌ Brak zdjęcia', inline: false }
+                    )
+                    .setColor('#2c3e50');
+
+                if (vehicle.imageUrl) embed.setThumbnail(vehicle.imageUrl);
+
+                const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                    new ButtonBuilder().setCustomId(`veh_show|${plate}`).setLabel('👁️ Dowód').setStyle(ButtonStyle.Secondary),
+                    new ButtonBuilder().setCustomId(`admin_veh_edit|${plate}`).setLabel('✏️ Edytuj').setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder().setCustomId(`admin_veh_del_img|${plate}`).setLabel('🖼️ Usuń Foto').setStyle(ButtonStyle.Secondary)
+                );
+
+                const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                    new ButtonBuilder().setCustomId(`admin_veh_usun|${plate}`).setLabel('🗑️ Usuń Auto').setStyle(ButtonStyle.Danger)
+                );
+
+                await interaction.reply({ embeds: [embed], components: [row1, row2], ephemeral: true });
+                return;
+            }
+
+            if (customId.startsWith('admin_veh_edit|')) {
+                const plate = customId.split('|')[1];
+                const vehicle = await (prisma as any).vehicle.findUnique({ where: { plate } });
+                if (!vehicle) return interaction.reply({ content: '🚫 Nie znaleziono pojazdu.', ephemeral: true });
+
+                const modal = new ModalBuilder()
+                    .setCustomId(`admin_veh_edit_modal|${plate}`)
+                    .setTitle(`Edycja: ${plate}`);
+
+                const brandInput = new TextInputBuilder().setCustomId('brand').setLabel('Marka').setStyle(TextInputStyle.Short).setValue(vehicle.brand).setRequired(true);
+                const modelInput = new TextInputBuilder().setCustomId('model').setLabel('Model').setStyle(TextInputStyle.Short).setValue(vehicle.model).setRequired(true);
+                const plateInput = new TextInputBuilder().setCustomId('plate').setLabel('Tablica (Plate)').setStyle(TextInputStyle.Short).setValue(vehicle.plate).setRequired(true);
+
+                modal.addComponents(
+                    new ActionRowBuilder<TextInputBuilder>().addComponents(brandInput),
+                    new ActionRowBuilder<TextInputBuilder>().addComponents(modelInput),
+                    new ActionRowBuilder<TextInputBuilder>().addComponents(plateInput)
+                );
+
+                await interaction.showModal(modal);
+                return;
+            }
+
+            if (customId.startsWith('admin_veh_del_img|')) {
+                const plate = customId.split('|')[1];
+                await (prisma as any).vehicle.update({ where: { plate }, data: { imageUrl: null } });
+                await interaction.reply({ content: `🖼️ Usunięto zdjęcie dla pojazdu **${plate}**.`, ephemeral: true });
+                return;
+            }
+
             if (customId.startsWith('veh_page|')) {
                 const [, targetId, pageStr, type] = customId.split('|');
                 const page = parseInt(pageStr);
@@ -1002,6 +1063,24 @@ export async function handleInteractions(interaction: Interaction) {
             }
         } else if (interaction.isModalSubmit()) {
             const { customId } = interaction;
+
+            if (customId.startsWith('admin_veh_edit_modal|')) {
+                const oldPlate = (customId.split('|')[1] || '').toUpperCase();
+                const brand = interaction.fields.getTextInputValue('brand');
+                const model = interaction.fields.getTextInputValue('model');
+                const newPlate = interaction.fields.getTextInputValue('plate').toUpperCase();
+
+                try {
+                    await (prisma as any).vehicle.update({
+                        where: { plate: oldPlate },
+                        data: { brand, model, plate: newPlate }
+                    });
+                    await interaction.reply({ content: `✅ Pomyślnie zaktualizowano dane pojazdu **${newPlate}**.`, ephemeral: true });
+                } catch (err) {
+                    await interaction.reply({ content: '❌ Błąd podczas aktualizacji: prawdopodobnie ta tablica jest już zajęta.', ephemeral: true });
+                }
+                return;
+            }
 
             if (customId.startsWith('veh_registration_modal|')) {
                 const pendingId = parseInt(customId.split('|')[1]);

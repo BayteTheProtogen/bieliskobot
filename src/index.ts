@@ -165,7 +165,7 @@ client.on('interactionCreate', async interaction => {
                     await interaction.reply({ content: '❌ Wystąpił błąd podczas wykonywania tej komendy.', ephemeral: true });
                 }
             }
-        } else if (interaction.commandName === 'ra-pojazd') {
+        } else if (interaction.commandName === 'rejestracja-adm') {
             await rejestracjaAdminCommands.execute(interaction);
         } else if (interaction.commandName === 'eco-admin') {
             await economyAdminCommands.execute(interaction);
