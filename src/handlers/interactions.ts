@@ -345,8 +345,23 @@ export async function handleInteractions(interaction: Interaction) {
                             await targetUser.send(`❌ Twój wniosek o rejestrację pojazdu **${pending.brand} ${pending.model}** został odrzucony przez Urząd.`);
                         } catch (e) {}
                     }
+
+                    // Usuwanie zdjęcia z cloud storage przy odrzuceniu
+                    if (pending.storageMessageId) {
+                        const STORAGE_CHANNEL_ID = '1491131655778209923';
+                        try {
+                            const storageChannel = await interaction.client.channels.fetch(STORAGE_CHANNEL_ID);
+                            if (storageChannel && storageChannel.isTextBased()) {
+                                const msg = await (storageChannel as any).messages.fetch(pending.storageMessageId);
+                                if (msg) await msg.delete();
+                            }
+                        } catch (err) {
+                            console.error('Failed to delete rejected image from storage:', err);
+                        }
+                    }
+
                     await (prisma as any).pendingVehicle.delete({ where: { id: pendingId } });
-                    await interaction.editReply({ content: '❌ Rejestracja została odrzucona.' });
+                    await interaction.editReply({ content: '❌ Rejestracja została odrzucona (zdjęcie usunięte z chmury).' });
                 }
 
                 await interaction.message.edit({ components: [] });
@@ -928,13 +943,6 @@ export async function handleInteractions(interaction: Interaction) {
 
                     const imageUrl = pending.imageUrl;
 
-                    // YOLO DETECTION
-                    const aiResult = await detectVehicle(imageUrl);
-                    const aiEmoji = aiResult.detected ? '✅' : '❌';
-                    const aiText = aiResult.detected 
-                        ? `Wykryto obiekt: **${aiResult.label}** (${aiResult.confidence}%)` 
-                        : `**Nie wykryto pojazdu** (Pewność: ${aiResult.confidence}%)`;
-
                     // Zaktualizuj PendingVehicle o dane z modalu
                     await (prisma as any).pendingVehicle.update({
                         where: { id: pendingId },
@@ -945,16 +953,17 @@ export async function handleInteractions(interaction: Interaction) {
                     const urzadChannel = await interaction.client.channels.fetch(URZAD_CHANNEL_ID);
                     
                     if (urzadChannel && urzadChannel.isTextBased()) {
+                        const aiEmoji = pending.aiConfidence > 40 ? '✅' : '⚠️';
                         const embed = new EmbedBuilder()
                             .setTitle('🚗 Nowy Wniosek o Rejestrację')
-                            .setDescription(`Obywatel <@${interaction.user.id}> chce zarejestrować pojazd.`)
+                            .setDescription(`Obywatel <@${interaction.user.id}> przesyła wniosek do rozpatrzenia.`)
                             .addFields(
                                 { name: 'Pojazd', value: `**${brand} ${model}**`, inline: true },
                                 { name: 'Właściciel', value: `${citizen.firstName} ${citizen.lastName}`, inline: true },
-                                { name: 'AI Vision Check', value: `${aiEmoji} ${aiText}`, inline: false }
+                                { name: 'AI Vision Check', value: `${aiEmoji} **${pending.aiLabel}** (${pending.aiConfidence}%)`, inline: false }
                             )
                             .setImage(imageUrl)
-                            .setColor(aiResult.detected ? '#2ecc71' : '#e67e22')
+                            .setColor(pending.aiConfidence > 40 ? '#2ecc71' : '#e67e22')
                             .setTimestamp();
 
                         const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -972,7 +981,7 @@ export async function handleInteractions(interaction: Interaction) {
                     }
 
                     await interaction.editReply({ 
-                        content: `✅ Twój wniosek o rejestrację pojazdu **${brand} ${model}** został wysłany do Urzędu.\nAI Vision Check: ${aiEmoji} ${aiText}\nCzekaj na decyzję urzędnika (otrzymasz DM).`
+                        content: `✅ Wniosek o rejestrację **${brand} ${model}** został wysłany do Urzędu.\nOtrzymasz powiadomienie, gdy urzędnik go rozpatrzy.`
                     });
                 } catch (err) {
                     console.error('Error in veh_registration_modal:', err);

@@ -119,5 +119,8 @@ model PendingVehicle {
   brand              String   @default("")
   model              String   @default("")
   imageUrl           String
+  storageMessageId   String?  // ID wiadomości w "cloud storage" do usunięcia przy odrzuceniu
+  aiConfidence       Int      @default(0)
+  aiLabel            String   @default("")
   createdAt          DateTime @default(now())
 }

@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } from 'discord.js';
 import { prisma } from '../services/db';
+import { detectVehicle } from '../services/vision';
 
 export const rejestracjaCommand = {
     data: new SlashCommandBuilder()
@@ -57,28 +58,64 @@ export const rejestracjaCommand = {
                     return interaction.reply({ content: '🚫 Musisz przesłać obrazek (screenshot) swojego auta!', ephemeral: true });
                 }
 
-                // Create a pending record to store the URL (Discord URLs are too long for customId)
-                const pending = await (prisma as any).pendingVehicle.create({
-                    data: {
-                        ownerId: interaction.user.id,
-                        imageUrl: attachment.url
+                await interaction.deferReply({ ephemeral: true });
+
+                try {
+                    // 1. Natychmiastowa analiza AI
+                    const aiResult = await detectVehicle(attachment.url);
+                    
+                    if (!aiResult.detected) {
+                        return interaction.editReply({ 
+                            content: `❌ **AI nie rozpoznało pojazdu.**\nSystem twierdzi, że to prawdopodobnie: **${aiResult.label || 'Brak'}** (${aiResult.confidence}%).\n\nZrób screena pod innym kątem (najlepiej w dzień, z bliska i bez przeszkód) i spróbuj ponownie.` 
+                        });
                     }
-                });
 
-                const embed = new EmbedBuilder()
-                    .setTitle('🚗 Rejestracja Nowego Pojazdu')
-                    .setDescription('Zdjęcie zostało zapisane. Teraz wprowadź markę i model pojazdu, aby dokończyć rejestrację.')
-                    .setImage(attachment.url)
-                    .setColor('#f1c40f');
+                    // 2. Upload do Cloud Storage (aby link nie wygasł)
+                    const STORAGE_CHANNEL_ID = '1491131655778209923';
+                    const storageChannel = await interaction.client.channels.fetch(STORAGE_CHANNEL_ID);
+                    
+                    let finalImageUrl = attachment.url;
+                    let storageMessageId = null;
 
-                const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                    new ButtonBuilder()
-                        .setCustomId(`veh_form|${pending.id}`)
-                        .setLabel('Uzupełnij dane auta')
-                        .setStyle(ButtonStyle.Primary)
-                );
+                    if (storageChannel && storageChannel.isTextBased()) {
+                        const storageMsg = await (storageChannel as any).send({
+                            content: `📦 Cloud Storage: Wniosek od <@${interaction.user.id}> (${interaction.user.tag})`,
+                            files: [attachment.url]
+                        });
+                        finalImageUrl = storageMsg.attachments.first()?.url || attachment.url;
+                        storageMessageId = storageMsg.id;
+                    }
 
-                await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+                    // 3. Zapisanie do PendingVehicle
+                    const pending = await (prisma as any).pendingVehicle.create({
+                        data: {
+                            ownerId: interaction.user.id,
+                            imageUrl: finalImageUrl,
+                            storageMessageId,
+                            aiConfidence: aiResult.confidence,
+                            aiLabel: aiResult.label
+                        }
+                    });
+
+                    const embed = new EmbedBuilder()
+                        .setTitle('🚗 Pojazd Zweryfikowany (AI)')
+                        .setDescription(`System pomyślnie rozpoznał: **${aiResult.label}**.\n\nKliknij przycisk poniżej, aby uzupełnić dane i wysłać wniosek do Urzędu.`)
+                        .setImage(finalImageUrl)
+                        .setColor('#2ecc71')
+                        .setFooter({ text: 'AI Vision System v1.0' });
+
+                    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(`veh_form|${pending.id}`)
+                            .setLabel('Uzupełnij dane auta i wyślij')
+                            .setStyle(ButtonStyle.Success)
+                    );
+
+                    await interaction.editReply({ embeds: [embed], components: [row] });
+                } catch (aiErr) {
+                    console.error('AI Processing error:', aiErr);
+                    await interaction.editReply({ content: '❌ Wystąpił błąd techniczny podczas analizy zdjęcia. Spróbuj ponownie później.' });
+                }
                 return;
             }
 
