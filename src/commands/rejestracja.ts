@@ -27,16 +27,21 @@ export const rejestracjaCommand = {
                 .addStringOption(option =>
                     option.setName('tablica')
                         .setDescription('Numer rejestracyjny pojazdu')
-                        .setRequired(true)
+                        .setRequired(false)
                 ))
         .addSubcommand(subcommand =>
             subcommand
                 .setName('sprawdz')
-                .setDescription('Narzędzie służb: Sprawdź dane po tablicy rejestracyjnej')
+                .setDescription('Narzędzie służb: Sprawdź dane po tablicy lub użytkowniku')
                 .addStringOption(option =>
                     option.setName('tablica')
                         .setDescription('Numer rejestracyjny pojazdu')
-                        .setRequired(true)
+                        .setRequired(false)
+                )
+                .addUserOption(option =>
+                    option.setName('użytkownik')
+                        .setDescription('Właściciel pojazdów do sprawdzenia')
+                        .setRequired(false)
                 )),
 
     async execute(interaction: ChatInputCommandInteraction) {
@@ -153,9 +158,40 @@ export const rejestracjaCommand = {
             }
 
             if (subcommand === 'popraw') {
-                const plate = interaction.options.getString('tablica', true).toUpperCase();
-                const vehicle = await (prisma as any).vehicle.findUnique({ where: { plate } });
+                const plate = interaction.options.getString('tablica')?.toUpperCase();
+                
+                if (!plate) {
+                    // Show list of own vehicles to choose from
+                    const vehicles = await (prisma as any).vehicle.findMany({ where: { ownerId: discordId } });
+                    if (vehicles.length === 0) {
+                        return interaction.reply({ content: 'Nie posiadasz żadnych zarejestrowanych pojazdów do poprawy.', ephemeral: true });
+                    }
 
+                    const embed = new EmbedBuilder()
+                        .setTitle('📝 Wybierz Pojazd do Poprawy danych')
+                        .setDescription('Kliknij przycisk "Popraw" przy wybranym aucie, aby złożyć wniosek do Urzędu.')
+                        .setColor('#0984e3');
+
+                    const rows = [];
+                    let currentRow = new ActionRowBuilder<ButtonBuilder>();
+                    for (let i = 0; i < vehicles.length; i++) {
+                        const v = vehicles[i];
+                        currentRow.addComponents(
+                            new ButtonBuilder()
+                                .setCustomId(`veh_popraw_list|${v.plate}`) // Trzeba dodać obsługe w interactions.ts
+                                .setLabel(`Popraw: ${v.brand} (${v.plate})`)
+                                .setStyle(ButtonStyle.Primary)
+                        );
+                        if (currentRow.components.length === 5 || i === vehicles.length - 1) {
+                            rows.push(currentRow);
+                            currentRow = new ActionRowBuilder<ButtonBuilder>();
+                        }
+                    }
+
+                    return interaction.reply({ embeds: [embed], components: rows, ephemeral: true });
+                }
+
+                const vehicle = await (prisma as any).vehicle.findUnique({ where: { plate } });
                 if (!vehicle || vehicle.ownerId !== discordId) {
                     return interaction.reply({ content: '🚫 Nie znaleziono Twojego pojazdu o takiej tablicy.', ephemeral: true });
                 }
@@ -198,31 +234,74 @@ export const rejestracjaCommand = {
             }
 
             if (subcommand === 'sprawdz') {
-                // Check LEO roles (reuse same role ID as for mandates/arrests)
+                // Check LEO roles (1490253667910029412)
                 const member = await interaction.guild?.members.fetch(discordId);
                 if (!member?.roles.cache.has('1490253667910029412')) {
                     return interaction.reply({ content: '🚫 Brak uprawnień do sprawdzania ewidencji pojazdów!', ephemeral: true });
                 }
 
-                const plate = interaction.options.getString('tablica', true).toUpperCase();
-                const vehicle = await (prisma as any).vehicle.findUnique({ where: { plate } });
+                const plate = interaction.options.getString('tablica')?.toUpperCase();
+                const target = interaction.options.getUser('użytkownik');
 
-                if (!vehicle) {
-                    return interaction.reply({ content: `🚫 Nie znaleziono pojazdu o numerze rejestracyjnym: **${plate}**.`, ephemeral: true });
+                if (!plate && !target) {
+                    return interaction.reply({ content: '🚫 Musisz podać numer tablicy lub oznaczyć użytkownika!', ephemeral: true });
                 }
 
-                const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                    new ButtonBuilder()
-                        .setCustomId(`veh_show|${plate}`)
-                        .setLabel('Wyświetl Dowód')
-                        .setStyle(ButtonStyle.Primary)
-                );
+                if (target) {
+                    const vehicles = await (prisma as any).vehicle.findMany({ where: { ownerId: target.id } });
+                    if (vehicles.length === 0) {
+                        return interaction.reply({ content: `Obywatel <@${target.id}> nie posiada żadnych zarejestrowanych pojazdów.`, ephemeral: true });
+                    }
 
-                await interaction.reply({
-                    content: `🔍 Zidentyfikowano pojazd: **${vehicle.brand} ${vehicle.model}**\nWłaściciel: **${vehicle.ownerName}**`,
-                    components: [row],
-                    ephemeral: true
-                });
+                    const embed = new EmbedBuilder()
+                        .setTitle(`🚗 Pojazdy Obywatela: ${target.username}`)
+                        .setDescription(`Wszystkie zarejestrowane auta dla użytkownika <@${target.id}>`)
+                        .setColor('#f1c40f')
+                        .addFields(
+                            vehicles.map((v: any) => ({
+                                name: `${v.brand} ${v.model} (**${v.plate}**)`,
+                                value: `Właściciel: **${v.ownerName}**`,
+                                inline: false
+                            }))
+                        );
+
+                    const rows = [];
+                    let currentRow = new ActionRowBuilder<ButtonBuilder>();
+                    for (let i = 0; i < vehicles.length; i++) {
+                        currentRow.addComponents(
+                            new ButtonBuilder()
+                                .setCustomId(`veh_show|${vehicles[i].plate}`)
+                                .setLabel(`Dowód ${vehicles[i].plate}`)
+                                .setStyle(ButtonStyle.Secondary)
+                        );
+                        if (currentRow.components.length === 5 || i === vehicles.length - 1) {
+                            rows.push(currentRow);
+                            currentRow = new ActionRowBuilder<ButtonBuilder>();
+                        }
+                    }
+
+                    return interaction.reply({ embeds: [embed], components: rows, ephemeral: true });
+                }
+
+                if (plate) {
+                    const vehicle = await (prisma as any).vehicle.findUnique({ where: { plate } });
+                    if (!vehicle) {
+                        return interaction.reply({ content: `🚫 Nie znaleziono pojazdu o numerze rejestracyjnym: **${plate}**.`, ephemeral: true });
+                    }
+
+                    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(`veh_show|${plate}`)
+                            .setLabel('Wyświetl Dowód')
+                            .setStyle(ButtonStyle.Primary)
+                    );
+
+                    await interaction.reply({
+                        content: `🔍 Zidentyfikowano pojazd: **${vehicle.brand} ${vehicle.model}**\nWłaściciel: **${vehicle.ownerName}**`,
+                        components: [row],
+                        ephemeral: true
+                    });
+                }
             }
         } catch (error) {
             console.error('Error in rejestracja execute:', error);

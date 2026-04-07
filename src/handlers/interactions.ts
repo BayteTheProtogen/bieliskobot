@@ -244,6 +244,65 @@ export async function handleInteractions(interaction: Interaction) {
                 return;
             }
 
+            if (customId.startsWith('veh_popraw_list|')) {
+                const plate = customId.split('|')[1];
+                const vehicle = await (prisma as any).vehicle.findUnique({ where: { plate } });
+                
+                if (!vehicle) return interaction.reply({ content: '🚫 Pojazd nie istnieje.', ephemeral: true });
+
+                const modal = {
+                    title: `Korekta: ${plate}`,
+                    custom_id: `veh_correction_modal|${plate}`,
+                    components: [
+                        {
+                            type: 1,
+                            components: [
+                                {
+                                    type: 4,
+                                    custom_id: 'brand',
+                                    label: 'Nowa Marka',
+                                    style: 1,
+                                    value: vehicle.brand,
+                                    required: true
+                                }
+                            ]
+                        },
+                        {
+                            type: 1,
+                            components: [
+                                {
+                                    type: 4,
+                                    custom_id: 'model',
+                                    label: 'Nowy Model',
+                                    style: 1,
+                                    value: vehicle.model,
+                                    required: true
+                                }
+                            ]
+                        }
+                    ]
+                };
+
+                await interaction.showModal(modal as any);
+                return;
+            }
+
+            if (customId.startsWith('admin_veh_usun|')) {
+                const plate = customId.split('|')[1];
+                const OWNER_ROLE_ID = '1490053669830393996';
+                const isOwner = interaction.user.id === OWNER_ROLE_ID || 
+                                (interaction.member?.roles && !Array.isArray(interaction.member.roles) && interaction.member.roles.cache.has(OWNER_ROLE_ID));
+                
+                if (!isOwner) return interaction.reply({ content: '🚫 Brak dostępu.', ephemeral: true });
+
+                const vehicle = await (prisma as any).vehicle.findUnique({ where: { plate } });
+                if (!vehicle) return interaction.reply({ content: '🚫 Pojazd już nie istnieje.', ephemeral: true });
+
+                await (prisma as any).vehicle.delete({ where: { plate } });
+                await interaction.reply({ content: `🗑️ Wyrejestrowano i usunięto pojazd: **${vehicle.brand} ${vehicle.model}** (**${plate}**).`, ephemeral: true });
+                return;
+            }
+
             if (customId.startsWith('urzad_approve|') || customId.startsWith('urzad_reject|')) {
                 const [action, plate, newBrand, newModel, requesterId] = customId.split('|');
                 

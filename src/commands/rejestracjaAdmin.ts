@@ -12,7 +12,12 @@ export const rejestracjaAdminCommands = {
                 .addStringOption(option =>
                     option.setName('tablica')
                         .setDescription('Numer rejestracyjny pojazdu')
-                        .setRequired(true)
+                        .setRequired(false)
+                )
+                .addUserOption(option =>
+                    option.setName('użytkownik')
+                        .setDescription('Właściciel pojazdu do usunięcia')
+                        .setRequired(false)
                 ))
         .addSubcommand(subcommand =>
             subcommand
@@ -37,19 +42,57 @@ export const rejestracjaAdminCommands = {
         const subcommand = interaction.options.getSubcommand();
 
         if (subcommand === 'usun') {
-            const plate = interaction.options.getString('tablica', true).toUpperCase();
-            const vehicle = await (prisma as any).vehicle.findUnique({ where: { plate } });
+            const plate = interaction.options.getString('tablica')?.toUpperCase();
+            const target = interaction.options.getUser('użytkownik');
 
-            if (!vehicle) {
-                return interaction.reply({ content: `🚫 Nie znaleziono pojazdu o numerze rejestracyjnym: **${plate}**.`, ephemeral: true });
+            if (!plate && !target) {
+                return interaction.reply({ content: '🚫 Musisz podać tablicę lub wybrać użytkownika!', ephemeral: true });
             }
 
-            await (prisma as any).vehicle.delete({ where: { plate } });
+            if (target) {
+                const vehicles = await (prisma as any).vehicle.findMany({ where: { ownerId: target.id } });
+                if (vehicles.length === 0) {
+                    return interaction.reply({ content: `Obywatel <@${target.id}> nie posiada żadnych zarejestrowanych pojazdów.`, ephemeral: true });
+                }
 
-            return interaction.reply({ 
-                content: `🗑️ Wyrejestrowano i usunięto pojazd: **${vehicle.brand} ${vehicle.model}** (TAB: **${plate}**)\nWłaściciel: **${vehicle.ownerName}**`,
-                ephemeral: true 
-            });
+                const embed = new EmbedBuilder()
+                    .setTitle(`🗑️ Zarządzanie Autami: ${target.username}`)
+                    .setDescription(`Wybierz pojazd użytkownika <@${target.id}> do usunięcia z ewidencji:`)
+                    .setColor('#e74c3c');
+
+                const rows = [];
+                let currentRow = new ActionRowBuilder<ButtonBuilder>();
+                for (let i = 0; i < vehicles.length; i++) {
+                    const v = vehicles[i];
+                    currentRow.addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(`admin_veh_usun|${v.plate}`)
+                            .setLabel(`Usuń: ${v.plate}`)
+                            .setStyle(ButtonStyle.Danger)
+                    );
+                    if (currentRow.components.length === 5 || i === vehicles.length - 1) {
+                        rows.push(currentRow);
+                        currentRow = new ActionRowBuilder<ButtonBuilder>();
+                    }
+                }
+
+                return interaction.reply({ embeds: [embed], components: rows, ephemeral: true });
+            }
+
+            if (plate) {
+                const vehicle = await (prisma as any).vehicle.findUnique({ where: { plate } });
+                if (!vehicle) {
+                    return interaction.reply({ content: `🚫 Nie znaleziono pojazdu o numerze rejestracyjnym: **${plate}**.`, ephemeral: true });
+                }
+
+                await (prisma as any).vehicle.delete({ where: { plate } });
+
+                return interaction.reply({ 
+                    content: `🗑️ Wyrejestrowano i usunięto pojazd: **${vehicle.brand} ${vehicle.model}** (TAB: **${plate}**)\nWłaściciel: **${vehicle.ownerName}**`,
+                    ephemeral: true 
+                });
+            }
+            return;
         }
 
         if (subcommand === 'profil') {
