@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc",
     "start": "npx prisma db push --accept-data-loss && node dist/index.js",
+    "pm2": "pm2 restart ecosystem.config.js",
     "dev": "ts-node src/index.js",
     "db:push": "prisma db push",
     "db:generate": "prisma generate"
