@@ -14,6 +14,7 @@ import { handleInteractions } from './handlers/interactions';
 import { handleKasynoInteractions } from './handlers/kasynoInteractions';
 import { rejestracjaCommand } from './commands/rejestracja';
 import { rejestracjaAdminCommands } from './commands/rejestracjaAdmin';
+import { poszukiwanieCommand } from './commands/poszukiwanie';
 import { erlcModeration } from './services/erlc';
 import { initVision } from './services/vision';
 import { generatePrisonerCard, generateArrestCard, generateKartotekaCard } from './services/canvas';
@@ -72,7 +73,8 @@ client.once(Events.ClientReady, async () => {
                 aresztCommand.data.toJSON(),
                 kartotekaCommand.data.toJSON(),
                 rejestracjaCommand.data.toJSON(),
-                rejestracjaAdminCommands.data.toJSON()
+                rejestracjaAdminCommands.data.toJSON(),
+                poszukiwanieCommand.data.toJSON()
             ] },
         );
         console.log('Successfully reloaded application (/) commands.');
@@ -141,8 +143,21 @@ client.on('interactionCreate', async interaction => {
                 if (interaction.commandName === 'areszt') await aresztCommand.execute(interaction);
                 if (interaction.commandName === 'kartoteka') await kartotekaCommand.execute(interaction);
             } catch (err) {
-                console.error('Error executing arrest/kartoteka:', err);
                 if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: '❌ Wystąpił błąd podczas przetwarzania wyroku.', ephemeral: true });
+            }
+        } else if (interaction.commandName === 'poszukiwanie') {
+            const memberRoles = interaction.member?.roles;
+            const isPolicja = memberRoles && 'cache' in memberRoles && (memberRoles as any).cache.has(POLICJA_ROLE);
+            
+            if (interaction.channelId !== POLICJA_CHANNEL && !isPolicja) {
+                await interaction.reply({ content: '🚫 Komendy poszukiwań można używać wyłącznie na kanale Policji!', ephemeral: true });
+                return;
+            }
+            try {
+                await poszukiwanieCommand.execute(interaction);
+            } catch (err) {
+                console.error('Error executing poszukiwanie:', err);
+                if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: '❌ Błąd systemu poszukiwań.', ephemeral: true });
             }
         } else if (interaction.commandName === 'rejestracja') {
             const memberRoles = interaction.member?.roles;

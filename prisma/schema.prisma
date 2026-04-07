@@ -124,3 +124,13 @@ model PendingVehicle {
   aiLabel            String   @default("")
   createdAt          DateTime @default(now())
 }
+
+model WantedPerson {
+  id               String   @id @default(cuid())
+  targetNick       String   @unique
+  robloxId         String? 
+  reason           String
+  officerDiscordId String
+  messageId        String?  // ID wiadomości na kanale #poszukiwani
+  createdAt        DateTime @default(now())
+}

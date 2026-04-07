@@ -1025,3 +1025,125 @@ export async function generateVehicleCard(data: VehicleCardData): Promise<Buffer
 
     return canvas.toBuffer('image/png');
 }
+
+export async function generateWantedPoster(nick: string, reason: string, avatarUrl: string): Promise<Buffer> {
+    const width = 600;
+    const height = 850;
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+
+    // 1. TŁO - Stary, pożółkły papier
+    const bgGrad = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, width);
+    bgGrad.addColorStop(0, '#f3e5ab'); // Jasny pergamin
+    bgGrad.addColorStop(1, '#c2b280'); // Ciemniejszy brzeg
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, width, height);
+
+    // Tekstura papieru (szum i plamy)
+    ctx.fillStyle = 'rgba(0,0,0,0.03)';
+    for (let i = 0; i < 2000; i++) {
+        ctx.beginPath();
+        const x = Math.random() * width;
+        const y = Math.random() * height;
+        const r = Math.random() * 2 + 1;
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    
+    // Ramka
+    ctx.strokeStyle = '#451a03';
+    ctx.lineWidth = 15;
+    ctx.strokeRect(20, 20, width - 40, height - 40);
+    ctx.lineWidth = 2;
+    ctx.strokeRect(35, 35, width - 70, height - 70);
+
+    // 2. NAGŁÓWEK - WANTED
+    ctx.fillStyle = '#451a03';
+    ctx.font = 'bold 110px RobotoBold';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(0,0,0,0.3)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 5;
+    ctx.fillText('WANTED', width / 2, 160);
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+
+    // 3. OBRAZ POSZUKIWANEGO (Awatara)
+    const imgX = 100;
+    const imgY = 200;
+    const imgW = 400;
+    const imgH = 400;
+
+    // Tło pod zdjęcie
+    ctx.fillStyle = 'rgba(0,0,0,0.1)';
+    ctx.fillRect(imgX - 10, imgY - 10, imgW + 20, imgH + 20);
+    
+    if (avatarUrl) {
+        try {
+            const response = await axios.get(avatarUrl, { responseType: 'arraybuffer' });
+            const avatar = await loadImage(Buffer.from(response.data));
+            
+            // Czarno-biały filtr dla klimatu retro
+            const tempCanvas = createCanvas(imgW, imgH);
+            const tCtx = tempCanvas.getContext('2d');
+            tCtx.drawImage(avatar, 0, 0, imgW, imgH);
+            
+            const imgData = tCtx.getImageData(0, 0, imgW, imgH);
+            for (let i = 0; i < imgData.data.length; i += 4) {
+                const avg = (imgData.data[i] + imgData.data[i + 1] + imgData.data[i + 2]) / 3;
+                imgData.data[i] = avg;
+                imgData.data[i + 1] = avg * 0.9; // Lekka sepia
+                imgData.data[i + 2] = avg * 0.8;
+            }
+            tCtx.putImageData(imgData, 0, 0);
+            
+            ctx.drawImage(tempCanvas, imgX, imgY, imgW, imgH);
+        } catch (e) {
+            ctx.fillStyle = '#94a3b8';
+            ctx.fillRect(imgX, imgY, imgW, imgH);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '40px Roboto';
+            ctx.fillText('BRAK FOTO', width / 2, imgY + imgH / 2);
+        }
+    }
+
+    // 4. DANE - NICK I POWÓD
+    ctx.fillStyle = '#451a03';
+    ctx.font = 'bold 48px RobotoBold';
+    ctx.fillText(nick.toUpperCase(), width / 2, 670);
+    
+    ctx.font = 'italic 24px Roboto';
+    const words = reason.split(' ');
+    let line = '';
+    let currentY = 730;
+    ctx.fillText('POWÓD POSZUKIWAŃ:', width / 2, 715);
+    
+    ctx.font = 'bold 28px Roboto';
+    for (const word of words) {
+        const test = line + word + ' ';
+        if (ctx.measureText(test).width > width - 120) {
+            ctx.fillText(line, width / 2, currentY);
+            line = word + ' ';
+            currentY += 35;
+        } else {
+            line = test;
+        }
+    }
+    ctx.fillText(line, width / 2, currentY);
+
+    // 5. STEMPEL "Bielisko Police"
+    ctx.save();
+    ctx.translate(width - 120, height - 120);
+    ctx.rotate(-0.2);
+    ctx.globalAlpha = 0.6;
+    ctx.strokeStyle = '#991b1b';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(-90, -35, 180, 70);
+    ctx.fillStyle = '#991b1b';
+    ctx.font = 'bold 20px Roboto';
+    ctx.fillText('BIELISKO', 0, -5);
+    ctx.fillText('POLICE', 0, 20);
+    ctx.restore();
+
+    return canvas.toBuffer('image/png');
+}
