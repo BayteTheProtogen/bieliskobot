@@ -1,6 +1,7 @@
 import { Interaction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, AttachmentBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, UserSelectMenuInteraction, StringSelectMenuInteraction, StringSelectMenuBuilder, MessageFlags } from 'discord.js';
 import { prisma } from '../services/db';
 import { generateIDCard, generateFineCard, generateArrestCard, generateVehicleCard } from '../services/canvas';
+import { getVehicleListPage, VehicleListType } from '../utils/vehicleList';
 import { getAvatarBust, getUserInfo } from '../services/roblox';
 import { logBotDM } from '../services/dmLogger';
 import { getItemsByCategory, getItemById } from '../data/shopData';
@@ -300,6 +301,22 @@ export async function handleInteractions(interaction: Interaction) {
 
                 await (prisma as any).vehicle.delete({ where: { plate } });
                 await interaction.reply({ content: `🗑️ Wyrejestrowano i usunięto pojazd: **${vehicle.brand} ${vehicle.model}** (**${plate}**).`, ephemeral: true });
+                return;
+            }
+
+            if (customId.startsWith('veh_page|')) {
+                const [, targetId, pageStr, type] = customId.split('|');
+                const page = parseInt(pageStr);
+                const result = await getVehicleListPage(interaction.user.id, targetId, page, type as VehicleListType);
+                await (interaction as any).update({ ...result });
+                return;
+            }
+
+            if (customId.startsWith('veh_page|')) {
+                const [, targetId, pageStr, type] = customId.split('|');
+                const page = parseInt(pageStr);
+                const result = await getVehicleListPage(interaction.user.id, targetId, page, type as VehicleListType);
+                await (interaction as any).update({ ...result });
                 return;
             }
 

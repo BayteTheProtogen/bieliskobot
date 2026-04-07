@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { prisma } from '../services/db';
+import { getVehicleListPage } from '../utils/vehicleList';
 
 export const rejestracjaAdminCommands = {
     data: new SlashCommandBuilder()
@@ -30,13 +31,12 @@ export const rejestracjaAdminCommands = {
                 )),
 
     async execute(interaction: ChatInputCommandInteraction) {
-        // Owner/Admin role check
         const ownerId = '1490053669830393996';
         const isOwner = interaction.user.id === ownerId || 
                         (interaction.member?.roles && !Array.isArray(interaction.member.roles) && interaction.member.roles.cache.has(ownerId));
         
         if (!isOwner) {
-            return interaction.reply({ content: '🚫 Brak dostępu do poleceń administracyjnych!', ephemeral: true });
+            return interaction.reply({ content: '🚫 Brak dostępu!', ephemeral: true });
         }
 
         const subcommand = interaction.options.getSubcommand();
@@ -46,49 +46,21 @@ export const rejestracjaAdminCommands = {
             const target = interaction.options.getUser('użytkownik');
 
             if (!plate && !target) {
-                return interaction.reply({ content: '🚫 Musisz podać tablicę lub wybrać użytkownika!', ephemeral: true });
+                return interaction.reply({ content: '🚫 Podaj tablicę lub osobę!', ephemeral: true });
             }
 
             if (target) {
-                const vehicles = await (prisma as any).vehicle.findMany({ where: { ownerId: target.id } });
-                if (vehicles.length === 0) {
-                    return interaction.reply({ content: `Obywatel <@${target.id}> nie posiada żadnych zarejestrowanych pojazdów.`, ephemeral: true });
-                }
-
-                const embed = new EmbedBuilder()
-                    .setTitle(`🗑️ Zarządzanie Autami: ${target.username}`)
-                    .setDescription(`Wybierz pojazd użytkownika <@${target.id}> do usunięcia z ewidencji:`)
-                    .setColor('#e74c3c');
-
-                const rows = [];
-                let currentRow = new ActionRowBuilder<ButtonBuilder>();
-                for (let i = 0; i < vehicles.length; i++) {
-                    const v = vehicles[i];
-                    currentRow.addComponents(
-                        new ButtonBuilder()
-                            .setCustomId(`admin_veh_usun|${v.plate}`)
-                            .setLabel(`Usuń: ${v.plate}`)
-                            .setStyle(ButtonStyle.Danger)
-                    );
-                    if (currentRow.components.length === 5 || i === vehicles.length - 1) {
-                        rows.push(currentRow);
-                        currentRow = new ActionRowBuilder<ButtonBuilder>();
-                    }
-                }
-
-                return interaction.reply({ embeds: [embed], components: rows, ephemeral: true });
+                const result = await getVehicleListPage(interaction.user.id, target.id, 0, 'admin_usun');
+                return interaction.reply({ ...result, ephemeral: true });
             }
 
             if (plate) {
                 const vehicle = await (prisma as any).vehicle.findUnique({ where: { plate } });
-                if (!vehicle) {
-                    return interaction.reply({ content: `🚫 Nie znaleziono pojazdu o numerze rejestracyjnym: **${plate}**.`, ephemeral: true });
-                }
+                if (!vehicle) return interaction.reply({ content: `🚫 Nie znaleziono: **${plate}**.`, ephemeral: true });
 
                 await (prisma as any).vehicle.delete({ where: { plate } });
-
                 return interaction.reply({ 
-                    content: `🗑️ Wyrejestrowano i usunięto pojazd: **${vehicle.brand} ${vehicle.model}** (TAB: **${plate}**)\nWłaściciel: **${vehicle.ownerName}**`,
+                    content: `🗑️ Usunięto pojazd: **${vehicle.brand} ${vehicle.model}** (**${plate}**)`,
                     ephemeral: true 
                 });
             }
@@ -97,40 +69,8 @@ export const rejestracjaAdminCommands = {
 
         if (subcommand === 'profil') {
             const target = interaction.options.getUser('użytkownik', true);
-            const vehicles = await (prisma as any).vehicle.findMany({ where: { ownerId: target.id } });
-
-            if (vehicles.length === 0) {
-                return interaction.reply({ content: `Obywatel <@${target.id}> nie posiada żadnych zarejestrowanych pojazdów.`, ephemeral: true });
-            }
-
-            const embed = new EmbedBuilder()
-                .setTitle(`🚗 Profil Aut: ${target.username}`)
-                .setDescription(`Wszystkie zarejestrowane pojazdy dla użytkownika <@${target.id}>`)
-                .setColor('#f1c40f')
-                .addFields(
-                    vehicles.map((v: any) => ({
-                        name: `${v.brand} ${v.model} (${v.plate})`,
-                        value: `ID: \`${v.id}\` | Data: ${v.createdAt.toLocaleDateString('pl-PL')}`,
-                        inline: false
-                    }))
-                );
-
-            const rows = [];
-            let currentRow = new ActionRowBuilder<ButtonBuilder>();
-            for (let i = 0; i < vehicles.length; i++) {
-                currentRow.addComponents(
-                    new ButtonBuilder()
-                        .setCustomId(`veh_show|${vehicles[i].plate}`)
-                        .setLabel(`Dowód ${vehicles[i].plate}`)
-                        .setStyle(ButtonStyle.Secondary)
-                );
-                if (currentRow.components.length === 5 || i === vehicles.length - 1) {
-                    rows.push(currentRow);
-                    currentRow = new ActionRowBuilder<ButtonBuilder>();
-                }
-            }
-
-            await interaction.reply({ embeds: [embed], components: rows, ephemeral: true });
+            const result = await getVehicleListPage(interaction.user.id, target.id, 0, 'show');
+            return interaction.reply({ ...result, ephemeral: true });
         }
     }
 };
