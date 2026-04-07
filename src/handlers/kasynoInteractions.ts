@@ -41,7 +41,7 @@ export async function handleKasynoInteractions(interaction: Interaction): Promis
 
         if (customId === 'kasyno_coinflip') {
             const embed = new EmbedBuilder()
-                .setTitle('🪙 Rzut Monetą - Obstawiasz?')
+                .setTitle('💰 Rzut Monetą - Obstawiasz?')
                 .setDescription('Wybierz wygrywającą stronę (Zwrot x2 gotówki)')
                 .setColor('#f1c40f');
             const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -58,7 +58,7 @@ export async function handleKasynoInteractions(interaction: Interaction): Promis
 
             const modal = new ModalBuilder()
                 .setCustomId(`kasyno_modal_${gameType}|${choice}`)
-                .setTitle(gameType === 'roulette' ? 'Zagraj w Ruletkę 🎲' : 'Rzuć Monetą 🪙');
+                .setTitle(gameType === 'roulette' ? 'Zagraj w Ruletkę 🎲' : 'Rzuć Monetą 💰');
             const betInput = new TextInputBuilder()
                 .setCustomId('bet')
                 .setLabel("Stawka z Twojej kieszeni")
@@ -174,9 +174,9 @@ async function playSlots(interaction: any, bet: number) {
 }
 
 async function playCoinflip(interaction: any, bet: number, userChoice: string) {
-    await interaction.editReply(`🪙 Rozgrzewam nadgarstek...`);
+    await interaction.editReply(`💰 Rozgrzewam nadgarstek...`);
     await delay(800);
-    await interaction.editReply(`🪙 Moneta wiruje w powietrzu...`);
+    await interaction.editReply(`💰 Moneta wiruje w powietrzu...`);
     await delay(1500);
 
     const rand = Math.random();

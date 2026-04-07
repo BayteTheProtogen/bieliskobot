@@ -32,7 +32,7 @@ export const kasynoCommand = {
                     .setStyle(ButtonStyle.Danger),
                 new ButtonBuilder()
                     .setCustomId('kasyno_coinflip')
-                    .setLabel('Moneta 🪙')
+                    .setLabel('Moneta 💰')
                     .setStyle(ButtonStyle.Primary)
             );
 
