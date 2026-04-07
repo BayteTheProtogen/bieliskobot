@@ -1,6 +1,6 @@
 import { Interaction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, AttachmentBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, UserSelectMenuInteraction, StringSelectMenuInteraction, StringSelectMenuBuilder, MessageFlags } from 'discord.js';
 import { prisma } from '../services/db';
-import { generateIDCard, generateFineCard, generateArrestCard } from '../services/canvas';
+import { generateIDCard, generateFineCard, generateArrestCard, generateVehicleCard } from '../services/canvas';
 import { getAvatarBust, getUserInfo } from '../services/roblox';
 import { logBotDM } from '../services/dmLogger';
 import { getItemsByCategory, getItemById } from '../data/shopData';
@@ -187,6 +187,90 @@ export async function handleInteractions(interaction: Interaction) {
 
         if (interaction.isButton()) {
             const { customId } = interaction;
+            
+            if (customId.startsWith('veh_form|')) {
+                const imageUrl = customId.replace('veh_form|', '');
+                const modal = new ModalBuilder()
+                    .setCustomId(`veh_registration_modal|${imageUrl}`)
+                    .setTitle('Dane Pojazdu');
+
+                const brandInput = new TextInputBuilder()
+                    .setCustomId('brand')
+                    .setLabel('Marka Pojazdu')
+                    .setPlaceholder('Np. BMW, Audi...')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true);
+
+                const modelInput = new TextInputBuilder()
+                    .setCustomId('model')
+                    .setLabel('Model Pojazdu')
+                    .setPlaceholder('Np. M5, A6...')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true);
+
+                modal.addComponents(
+                    new ActionRowBuilder<TextInputBuilder>().addComponents(brandInput),
+                    new ActionRowBuilder<TextInputBuilder>().addComponents(modelInput)
+                );
+
+                await interaction.showModal(modal);
+                return;
+            }
+
+            if (customId.startsWith('veh_show|')) {
+                const plate = customId.split('|')[1];
+                await interaction.deferReply({ ephemeral: true });
+
+                const vehicle = await (prisma as any).vehicle.findUnique({ where: { plate } });
+                if (!vehicle) {
+                    return interaction.editReply({ content: '🚫 Nie znaleziono danych tego pojazdu.' });
+                }
+
+                try {
+                    const buffer = await generateVehicleCard({
+                        ownerName: vehicle.ownerName,
+                        brand: vehicle.brand,
+                        model: vehicle.model,
+                        plate: vehicle.plate,
+                        issuedAt: vehicle.createdAt.toLocaleDateString('pl-PL'),
+                        carImageUrl: vehicle.imageUrl
+                    });
+                    const attachment = new AttachmentBuilder(buffer, { name: `dowod_${plate}.png` });
+                    await interaction.editReply({ files: [attachment] });
+                } catch (e) {
+                    await interaction.editReply({ content: 'Błąd generowania dokumentu.' });
+                }
+                return;
+            }
+
+            if (customId.startsWith('urzad_approve|') || customId.startsWith('urzad_reject|')) {
+                const [action, plate, newBrand, newModel, requesterId] = customId.split('|');
+                
+                const URZAD_CHANNEL_ID = '1490393894448271370';
+                if (interaction.channelId !== URZAD_CHANNEL_ID) return;
+
+                if (action === 'urzad_reject') {
+                    await interaction.update({ content: `❌ **Wniosek o korektę ${plate} odrzucony** przez <@${interaction.user.id}>.`, components: [] });
+                    try {
+                        const user = await interaction.client.users.fetch(requesterId);
+                        await user.send(`❌ Twój wniosek o korektę pojazdu **${plate}** został odrzucony przez Urząd.`);
+                    } catch {}
+                    return;
+                }
+
+                await prisma.vehicle.update({
+                    where: { plate },
+                    data: { brand: newBrand, model: newModel }
+                });
+
+                await interaction.update({ content: `✅ **Wniosek o korektę ${plate} zatwierdzony**! Dane zmienione na: ${newBrand} ${newModel}.`, components: [] });
+                
+                try {
+                    const user = await interaction.client.users.fetch(requesterId);
+                    await user.send(`✅ Twój wniosek o korektę pojazdu **${plate}** został pomyślnie zatwierdzony przez Urząd!`);
+                } catch {}
+                return;
+            }
 
             if (customId === 'shop_admin_tools') {
                 const OWNER_ROLE_ID = '1490053669830393996';
@@ -746,6 +830,95 @@ export async function handleInteractions(interaction: Interaction) {
             }
         } else if (interaction.isModalSubmit()) {
             const { customId } = interaction;
+
+            if (customId.startsWith('veh_registration_modal|')) {
+                const imageUrl = customId.replace('veh_registration_modal|', '');
+                const brand = interaction.fields.getTextInputValue('brand');
+                const model = interaction.fields.getTextInputValue('model');
+
+                await interaction.deferReply({ ephemeral: true });
+
+                const citizen = await prisma.citizen.findUnique({ where: { discordId: interaction.user.id } });
+                if (!citizen) return interaction.editReply({ content: 'Błąd: Najpierw wyrób dowód osobisty!' });
+
+                // Generate Unique Plate
+                let plate = '';
+                let attempts = 0;
+                while (attempts < 10) {
+                    const randomPart = Math.floor(10000 + Math.random() * 90000);
+                    const testPlate = `BI ${randomPart}`;
+                    const exists = await (prisma as any).vehicle.findUnique({ where: { plate: testPlate } });
+                    if (!exists) {
+                        plate = testPlate;
+                        break;
+                    }
+                    attempts++;
+                }
+
+                if (!plate) return interaction.editReply({ content: 'Błąd: Nie udało się wygenerować unikalnej tablicy. Spróbuj ponownie.' });
+
+                const vehicle = await (prisma as any).vehicle.create({
+                    data: {
+                        ownerId: interaction.user.id,
+                        ownerName: `${citizen.firstName} ${citizen.lastName}`,
+                        brand,
+                        model,
+                        plate,
+                        imageUrl
+                    }
+                });
+
+                const buffer = await generateVehicleCard({
+                    ownerName: vehicle.ownerName,
+                    brand: vehicle.brand,
+                    model: vehicle.model,
+                    plate: vehicle.plate,
+                    issuedAt: vehicle.createdAt.toLocaleDateString('pl-PL'),
+                    carImageUrl: vehicle.imageUrl
+                });
+
+                const attachment = new AttachmentBuilder(buffer, { name: `dowod_${plate.replace(' ', '_')}.png` });
+                await interaction.editReply({ 
+                    content: `✅ Pomyślnie zarejestrowano pojazd! Twoja nowa tablica to: **${plate}**`,
+                    files: [attachment]
+                });
+                return;
+            }
+
+            if (customId.startsWith('veh_correction_modal|')) {
+                const plate = customId.split('|')[1];
+                const newBrand = interaction.fields.getTextInputValue('brand');
+                const newModel = interaction.fields.getTextInputValue('model');
+
+                await interaction.reply({ content: '✅ Twoja prośba o korektę została wysłana do Urzędu.', ephemeral: true });
+
+                const URZAD_CHANNEL_ID = '1490393894448271370';
+                const channel = await interaction.client.channels.fetch(URZAD_CHANNEL_ID);
+                if (channel && channel.isTextBased()) {
+                    const embed = new EmbedBuilder()
+                        .setTitle('⚖️ Wniosek o Korektę Pojazdu')
+                        .setDescription(`Obywatel <@${interaction.user.id}> prosi o zmianę danych pojazdu **${plate}**.`)
+                        .addFields(
+                            { name: 'Nowe dane', value: `🚗 ${newBrand} ${newModel}`, inline: true }
+                        )
+                        .setColor('#f39c12')
+                        .setTimestamp();
+
+                    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(`urzad_approve|${plate}|${newBrand}|${newModel}|${interaction.user.id}`)
+                            .setLabel('Zatwierdź')
+                            .setStyle(ButtonStyle.Success),
+                        new ButtonBuilder()
+                            .setCustomId(`urzad_reject|${plate}|${newBrand}|${newModel}|${interaction.user.id}`)
+                            .setLabel('Odrzuć')
+                            .setStyle(ButtonStyle.Danger)
+                    );
+
+                    await (channel as any).send({ embeds: [embed], components: [row] });
+                }
+                return;
+            }
             
             if (['admin_shop_check_modal', 'admin_shop_add_modal', 'admin_shop_remove_modal', 'admin_shop_wipe_modal'].includes(customId)) {
                 await interaction.deferReply({ ephemeral: true });
@@ -963,7 +1136,7 @@ export async function handleInteractions(interaction: Interaction) {
                 }
                 
                 // Zapis mandatu do logów historii kar
-                await prisma.fineLog.create({
+                await (prisma as any).fineLog.create({
                     data: {
                         citizenId: target.discordId,
                         playerNick: target.robloxNick,
@@ -1029,7 +1202,7 @@ export async function handleInteractions(interaction: Interaction) {
 
                 await interaction.reply({ content: 'Przygotowywanie dokumentacji osadzenia... 🚓', flags: [MessageFlags.Ephemeral] });
 
-                await prisma.arrestLog.create({
+                await (prisma as any).arrestLog.create({
                     data: {
                         citizenId: target.discordId,
                         playerNick: target.robloxNick,

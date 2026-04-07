@@ -12,6 +12,8 @@ import { aresztCommand } from './commands/areszt';
 import { kartotekaCommand } from './commands/kartoteka';
 import { handleInteractions } from './handlers/interactions';
 import { handleKasynoInteractions } from './handlers/kasynoInteractions';
+import { rejestracjaCommand } from './commands/rejestracja';
+import { rejestracjaAdminCommands } from './commands/rejestracjaAdmin';
 import { erlcModeration } from './services/erlc';
 import { generatePrisonerCard, generateArrestCard, generateKartotekaCard } from './services/canvas';
 import { prisma } from './services/db';
@@ -60,7 +62,9 @@ client.once(Events.ClientReady, async () => {
                 logiCommand.data.toJSON(),
                 kasynoCommand.data.toJSON(),
                 aresztCommand.data.toJSON(),
-                kartotekaCommand.data.toJSON()
+                kartotekaCommand.data.toJSON(),
+                rejestracjaCommand.data.toJSON(),
+                rejestracjaAdminCommands.data.toJSON()
             ] },
         );
         console.log('Successfully reloaded application (/) commands.');
@@ -99,6 +103,14 @@ client.on('interactionCreate', async interaction => {
             if (interaction.commandName === 'mandat') await mandatCommand.execute(interaction);
             if (interaction.commandName === 'areszt') await aresztCommand.execute(interaction);
             if (interaction.commandName === 'kartoteka') await kartotekaCommand.execute(interaction);
+        } else if (interaction.commandName === 'rejestracja') {
+            if (interaction.channelId !== '1490012050888593439') {
+                await interaction.reply({ content: '🚫 Rejestrację pojazdów można przeprowadzić wyłącznie na kanale <#1490012050888593439>!', ephemeral: true });
+                return;
+            }
+            await rejestracjaCommand.execute(interaction);
+        } else if (interaction.commandName === 'ra-pojazd') {
+            await rejestracjaAdminCommands.execute(interaction);
         } else if (interaction.commandName === 'eco-admin') {
             await economyAdminCommands.execute(interaction);
         } else if (interaction.commandName === 'logi') {

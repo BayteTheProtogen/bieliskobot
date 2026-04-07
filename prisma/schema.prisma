@@ -98,3 +98,17 @@ model ArrestLog {
   time               Int      // e.g. minutes or months
   createdAt          DateTime @default(now())
 }
+
+model Vehicle {
+  id                 String   @id @default(cuid())
+  ownerId            String   // Discord ID właściciela
+  ownerName          String   // Imię i Nazwisko z Citizen
+  brand              String
+  model              String
+  plate              String   @unique // Autogenerowane (np. BI 12345)
+  imageUrl           String   // URL do zdjęcia auta
+  createdAt          DateTime @default(now())
+
+  @@index([ownerId])
+  @@index([plate])
+}
