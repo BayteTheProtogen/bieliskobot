@@ -4,7 +4,7 @@ import { createCanvas, loadImage } from '@napi-rs/canvas';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const MODEL_URL = 'https://github.com/ultralytics/assets/releases/download/v8.1.0/yolov8n.onnx';
+const MODEL_URL = 'https://huggingface.co/flightsnotights/yolov8n_onnx/resolve/main/yolov8n.onnx';
 const MODEL_PATH = path.join(process.cwd(), 'models', 'yolov8n.onnx');
 
 let session: ort.InferenceSession | null = null;
