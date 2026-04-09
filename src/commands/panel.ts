@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, PermissionsBitField } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
 import { prisma } from '../services/db';
 
 export const panelCommand = {
@@ -7,14 +7,18 @@ export const panelCommand = {
         .setDescription('Uzyskaj dostęp do bezhasłowego Web Panelu Moderatora'),
 
     async execute(interaction: ChatInputCommandInteraction) {
-        const MOD_ROLES = ['1490253667910029412', '1490053669830393996']; // Role, które mają dostęp do Panelu
+        const { PermissionsBitField } = require('discord.js');
+        const MOD_ROLES = ['1490253667910029412', '1490053669830393996']; // Role: Policja + Właściciel
+        
+        console.log(`[Panel Auth] Sprawdzanie uprawnień dla: ${interaction.user.username} (ID: ${interaction.user.id})`);
         
         const member = await interaction.guild?.members.fetch(interaction.user.id);
         const isAdmin = member?.permissions.has(PermissionsBitField.Flags.Administrator);
+        const hasRole = MOD_ROLES.some(role => member?.roles.cache.has(role));
         const isOwner = interaction.user.id === '1490053669830393996';
-        const hasModRole = MOD_ROLES.some(role => member?.roles.cache.has(role));
 
-        if (!isOwner && !isAdmin && !hasModRole) {
+        if (!hasRole && !isOwner && !isAdmin) {
+            console.log(`[Panel Auth] ODMOWA dla ${interaction.user.username}. Role: ${member?.roles.cache.map(r => r.id).join(', ')}`);
             return interaction.reply({ content: '🚫 Brak dostępu do Panelu Moderatora!', ephemeral: true });
         }
 
