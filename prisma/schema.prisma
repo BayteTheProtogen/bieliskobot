@@ -136,10 +136,11 @@ model WantedPerson {
 }
 
 model WebSession {
-  token        String   @id
-  discordId    String
-  createdAt    DateTime @default(now())
-  expiresAt    DateTime
+  token         String   @id
+  discordId     String
+  createdAt     DateTime @default(now())
+  expiresAt     DateTime
+  lastHeartbeat DateTime @default(now())
 }
 
 model ModerationShift {

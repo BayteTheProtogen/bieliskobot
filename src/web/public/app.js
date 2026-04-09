@@ -37,12 +37,54 @@ window.addEventListener('DOMContentLoaded', async () => {
         elApp.style.display = 'block';
         
         loadPlayers();
+        loadActiveModerators();
+
         setInterval(loadPlayers, 120000); // 2 min auto-refresh
+        setInterval(loadActiveModerators, 60000); // 1 min refresh mods
+        
+        // Heartbeat system (every 30s)
+        setInterval(async () => {
+            if (sessionToken) {
+                try { await apiCall('/api/heartbeat', 'POST'); } 
+                catch (e) { console.error('Heartbeat failure'); }
+            }
+        }, 30000);
+
     } catch (e) {
         showErrorAuth('Sesja wygasła lub jest nieprawidłowa.');
         localStorage.removeItem('panelToken');
     }
 });
+
+// Load Active Moderators
+async function loadActiveModerators() {
+    try {
+        const mods = await apiCall('/api/moderators');
+        renderModerators(mods);
+    } catch (e) {
+        console.error('Failed to load mods');
+    }
+}
+
+function renderModerators(mods) {
+    const list = document.getElementById('activeModeratorsList');
+    if (!list) return;
+
+    if (mods.length === 0) {
+        list.innerHTML = '<p class="empty-mods">Nikt nie jest obecnie na służbie.</p>';
+        return;
+    }
+
+    list.innerHTML = mods.map(m => `
+        <div class="mod-item">
+            <img src="${m.avatar || 'https://cdn.discordapp.com/embed/avatars/0.png'}" class="mod-avatar">
+            <div class="mod-info">
+                <span class="mod-name">${m.username}</span>
+                <span class="mod-time">Służba od ${new Date(m.startTime).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
+        </div>
+    `).join('');
+}
 
 // API Helper
 async function apiCall(endpoint, method = 'GET', body = null) {
