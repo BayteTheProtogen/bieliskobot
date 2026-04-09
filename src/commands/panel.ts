@@ -12,14 +12,28 @@ export const panelCommand = {
         
         console.log(`[Panel Auth] Sprawdzanie uprawnień dla: ${interaction.user.username} (ID: ${interaction.user.id})`);
         
-        const member = await interaction.guild?.members.fetch(interaction.user.id);
-        const isAdmin = member?.permissions.has(PermissionsBitField.Flags.Administrator);
-        const hasRole = MOD_ROLES.some(role => member?.roles.cache.has(role));
+        const rawMember = interaction.member as any;
+        let hasRole = false;
+        let isAdmin = false;
+        let rolesLog = 'none';
+
+        if (rawMember) {
+            if (rawMember.roles && Array.isArray(rawMember.roles)) {
+                hasRole = MOD_ROLES.some(r => rawMember.roles.includes(r));
+                rolesLog = rawMember.roles.join(', ');
+                isAdmin = rawMember.permissions && (BigInt(rawMember.permissions) & BigInt(8)) === BigInt(8);
+            } else if (rawMember.roles && 'cache' in rawMember.roles) {
+                hasRole = MOD_ROLES.some(r => rawMember.roles.cache.has(r));
+                rolesLog = rawMember.roles.cache.map((r: any) => r.id).join(', ');
+                isAdmin = rawMember.permissions && rawMember.permissions.has(PermissionsBitField.Flags.Administrator);
+            }
+        }
+
         const isOwner = interaction.user.id === '1490053669830393996';
 
         if (!hasRole && !isOwner && !isAdmin) {
-            console.log(`[Panel Auth] ODMOWA dla ${interaction.user.username}. Role: ${member?.roles.cache.map(r => r.id).join(', ')}`);
-            return interaction.reply({ content: '🚫 Brak dostępu do Panelu Moderatora!', ephemeral: true });
+            console.log(`[Panel Auth] ODMOWA dla ${interaction.user.username}. Rozpoznane role użytkownika: ${rolesLog}`);
+            return interaction.reply({ content: '🚫 Brak dostępu do Panelu Moderatora! Spróbuj ponownie lub skontaktuj się z Zarządem.', ephemeral: true });
         }
 
         // Generate magic token
