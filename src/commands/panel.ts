@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, PermissionsBitField } from 'discord.js';
 import { prisma } from '../services/db';
 
 export const panelCommand = {
@@ -10,9 +10,11 @@ export const panelCommand = {
         const MOD_ROLES = ['1490253667910029412', '1490053669830393996']; // Role, które mają dostęp do Panelu
         
         const member = await interaction.guild?.members.fetch(interaction.user.id);
-        const hasAccess = MOD_ROLES.some(role => member?.roles.cache.has(role)) || interaction.user.id === '1490053669830393996';
+        const isAdmin = member?.permissions.has(PermissionsBitField.Flags.Administrator);
+        const isOwner = interaction.user.id === '1490053669830393996';
+        const hasModRole = MOD_ROLES.some(role => member?.roles.cache.has(role));
 
-        if (!hasAccess) {
+        if (!isOwner && !isAdmin && !hasModRole) {
             return interaction.reply({ content: '🚫 Brak dostępu do Panelu Moderatora!', ephemeral: true });
         }
 
