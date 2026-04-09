@@ -55,7 +55,7 @@ export function startWebServer(client: Client, port: number = 3000) {
 
         // Static Files
         if (!pathname.startsWith('/api/')) {
-            const publicDir = path.join(__dirname, 'public');
+            const publicDir = path.join(process.cwd(), 'src', 'web', 'public');
             let filePath = path.join(publicDir, pathname === '/' ? 'index.html' : pathname);
             
             // Basic security to avoid directory traversal
