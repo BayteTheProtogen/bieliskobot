@@ -33,7 +33,7 @@ export const panelCommand = {
             }
         });
 
-        const baseUrl = process.env.WEB_URL || 'http://localhost:3000';
+        const baseUrl = process.env.WEB_URL || 'https://bieliskobot-production.up.railway.app';
         const panelUrl = `${baseUrl}/?token=${token}`;
 
         const embed = new EmbedBuilder()
