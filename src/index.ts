@@ -112,9 +112,9 @@ client.on('interactionCreate', async interaction => {
                     await interaction.reply({ content: '❌ Wystąpił błąd podczas wykonywania tej komendy.', ephemeral: true });
                 }
             }
-        } else if (['portfel', 'praca', 'dorobka', 'sklep', 'ekwipunek', 'kasyno'].includes(interaction.commandName)) {
-            if (interaction.channelId !== '1490011537199595773') {
-                await interaction.reply({ content: '🚫 Komendy ekonomii, sklepu, pracy oraz kasyna są dozwolone wyłącznie na kanale <#1490011537199595773>!', ephemeral: true });
+        } else if (['portfel', 'praca', 'dorobka', 'sklep', 'ekwipunek'].includes(interaction.commandName)) {
+            if (interaction.channelId !== '1490011312669855904') {
+                await interaction.reply({ content: '🚫 Komendy ekonomii, sklepu, pracy oraz ekwipunku są dozwolone wyłącznie na kanale <#1490011312669855904>!', ephemeral: true });
                 return;
             }
             if (interaction.commandName === 'portfel') await economyCommands.execute(interaction);
@@ -122,7 +122,12 @@ client.on('interactionCreate', async interaction => {
             if (interaction.commandName === 'dorobka') await extraWorkCommands.execute(interaction);
             if (interaction.commandName === 'sklep') await sklepCommands.execute(interaction);
             if (interaction.commandName === 'ekwipunek') await ekwipunekCommands.execute(interaction);
-            if (interaction.commandName === 'kasyno') await kasynoCommand.execute(interaction);
+        } else if (interaction.commandName === 'kasyno') {
+            if (interaction.channelId !== '1490011537199595773') {
+                await interaction.reply({ content: '🚫 Komenda kasyna jest dozwolona wyłącznie na kanale <#1490011537199595773>!', ephemeral: true });
+                return;
+            }
+            await kasynoCommand.execute(interaction);
         } else if (interaction.commandName === 'mandat') {
             if (interaction.channelId !== '1490365930818109490') {
                 await interaction.reply({ content: '🚫 Mandaty można wypisywać wyłącznie na kanale <#1490365930818109490>!', ephemeral: true });
@@ -134,16 +139,25 @@ client.on('interactionCreate', async interaction => {
                 console.error('Error executing mandatCommand:', err);
                 if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: '❌ Wystąpił błąd podczas wystawiania mandatu.', ephemeral: true });
             }
-        } else if (['areszt', 'kartoteka'].includes(interaction.commandName)) {
+        } else if (interaction.commandName === 'areszt') {
             if (interaction.channelId !== '1490366000615526460') {
-                await interaction.reply({ content: '🚫 Areszty oraz kartotekę można sprawdzać wyłącznie na kanale <#1490366000615526460>!', ephemeral: true });
+                await interaction.reply({ content: '🚫 Areszty można wystawiać wyłącznie na kanale <#1490366000615526460>!', ephemeral: true });
                 return;
             }
             try {
-                if (interaction.commandName === 'areszt') await aresztCommand.execute(interaction);
-                if (interaction.commandName === 'kartoteka') await kartotekaCommand.execute(interaction);
+                await aresztCommand.execute(interaction);
             } catch (err) {
                 if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: '❌ Wystąpił błąd podczas przetwarzania wyroku.', ephemeral: true });
+            }
+        } else if (interaction.commandName === 'kartoteka') {
+            if (interaction.channelId !== POLICJA_CHANNEL) {
+                await interaction.reply({ content: `🚫 Kartotekę można sprawdzać wyłącznie na kanale <#${POLICJA_CHANNEL}>!`, ephemeral: true });
+                return;
+            }
+            try {
+                await kartotekaCommand.execute(interaction);
+            } catch (err) {
+                if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: '❌ Wystąpił błąd podczas sprawdzania kartoteki.', ephemeral: true });
             }
         } else if (interaction.commandName === 'poszukiwanie') {
             const memberRoles = interaction.member?.roles;
