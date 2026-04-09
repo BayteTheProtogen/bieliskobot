@@ -15,6 +15,7 @@ import { handleKasynoInteractions } from './handlers/kasynoInteractions';
 import { rejestracjaCommand } from './commands/rejestracja';
 import { rejestracjaAdminCommands } from './commands/rejestracjaAdmin';
 import { poszukiwanieCommand } from './commands/poszukiwanie';
+import { panelCommand } from './commands/panel';
 import { erlcModeration } from './services/erlc';
 import { initVision } from './services/vision';
 import { generatePrisonerCard, generateArrestCard, generateKartotekaCard } from './services/canvas';
@@ -22,6 +23,7 @@ import { prisma } from './services/db';
 import { EmbedBuilder, AttachmentBuilder, TextChannel, ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
 import { startERLCPolling } from './services/erlcPoller';
 import { BAN_ROOM_ID, finalizeAction } from './services/modActions';
+import { startWebServer } from './web/server';
 
 dotenv.config();
 
@@ -74,7 +76,8 @@ client.once(Events.ClientReady, async () => {
                 kartotekaCommand.data.toJSON(),
                 rejestracjaCommand.data.toJSON(),
                 rejestracjaAdminCommands.data.toJSON(),
-                poszukiwanieCommand.data.toJSON()
+                poszukiwanieCommand.data.toJSON(),
+                panelCommand.data.toJSON()
             ] },
         );
         console.log('Successfully reloaded application (/) commands.');
@@ -84,6 +87,9 @@ client.once(Events.ClientReady, async () => {
 
     // Start ERLC polling for in-game mod action detection
     startERLCPolling(client);
+    
+    // Uruchom WebUI API
+    startWebServer(client, Number(process.env.PORT) || 3000);
 });
 
 client.on('interactionCreate', async interaction => {
@@ -172,6 +178,13 @@ client.on('interactionCreate', async interaction => {
             } catch (err) {
                 console.error('Error executing poszukiwanie:', err);
                 if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: '❌ Błąd systemu poszukiwań.', ephemeral: true });
+            }
+        } else if (interaction.commandName === 'panel') {
+            try {
+                await panelCommand.execute(interaction);
+            } catch (err) {
+                console.error('Error executing panel:', err);
+                if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: '❌ Błąd panelu.', ephemeral: true });
             }
         } else if (interaction.commandName === 'rejestracja') {
             const memberRoles = interaction.member?.roles;

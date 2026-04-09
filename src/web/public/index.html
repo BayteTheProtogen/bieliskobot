@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bielisko Mod Panel</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script> <!-- Icons -->
+</head>
+<body>
+    <!-- Background animations -->
+    <div class="bg-shape bg-shape-1"></div>
+    <div class="bg-shape bg-shape-2"></div>
+
+    <div id="loader" class="glass-panel centered">
+        <div class="spinner"></div>
+        <p>Autoryzacja w toku...</p>
+    </div>
+
+    <div id="app" style="display: none;">
+        <!-- Header / Nav -->
+        <header class="glass-header">
+            <div class="header-logo">
+                <span class="logo-icon">🛡️</span> Bielisko<span class="highlight">Panel</span>
+            </div>
+            
+            <div class="header-actions">
+                <div class="shift-status" id="shiftStatusBadge">
+                    <div class="status-dot"></div> <span id="shiftStatusText">Brak służby</span>
+                </div>
+                <button id="btnToggleShift" class="btn btn-outline">Zacznij Służbę</button>
+            </div>
+
+            <div class="user-profile">
+                <img id="userAvatar" src="" alt="Avatar" class="avatar default-avatar">
+                <div class="user-info">
+                    <span id="userName" class="username">...</span>
+                    <span class="role">Moderator</span>
+                </div>
+            </div>
+        </header>
+
+        <main class="dashboard-grid">
+            <!-- Sidebar with Quick Actions -->
+            <aside class="sidebar">
+                <div class="glass-panel sticky-card">
+                    <h3>Szybkie akcje</h3>
+                    <p class="subtitle">Wymagana aktywna służba.</p>
+                    
+                    <button class="btn btn-full btn-log" onclick="openLogModal()">
+                        <span class="icon">📝</span> Utwórz Log Raport
+                    </button>
+                    
+                    <div class="divider"></div>
+                    
+                    <div class="stats-box">
+                        <div class="stat">
+                            <span class="stat-value" id="statsPlayers">0</span>
+                            <span class="stat-label">Online W grze</span>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Content Area: Players List -->
+            <section class="main-content">
+                <div class="glass-panel">
+                    <div class="panel-header">
+                        <h2>Gracze na serwerze (ER:LC)</h2>
+                        <div class="panel-controls">
+                            <span id="lastRefreshTime" class="refresh-indicator">Zaktualizowano: teraz</span>
+                            <button id="btnRefresh" class="btn-icon" title="Odśwież manualnie">🔄</button>
+                        </div>
+                    </div>
+
+                    <div class="search-bar">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="searchInput" placeholder="Szukaj gracza (Roblox Nick)...">
+                    </div>
+
+                    <div class="table-container">
+                        <table id="playersTable">
+                            <thead>
+                                <tr>
+                                    <th>Gracz (Roblox)</th>
+                                    <th>Permisje</th>
+                                    <th class="actions-col">Narzędzia Mod.</th>
+                                </tr>
+                            </thead>
+                            <tbody id="playersList">
+                                <!-- Data injected via JS -->
+                            </tbody>
+                        </table>
+                        <div id="noPlayers" class="empty-state" style="display:none;">
+                            <span class="empty-icon">👻</span>
+                            <p>Brak graczy spełniających kryteria wyszukiwania.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- action Modal -->
+    <div id="actionModal" class="modal-overlay" style="display:none;">
+        <div class="modal glass-panel">
+            <h2 id="modalTitle">Wykonaj akcję na <span id="modalTargetNick" class="highlight">...</span></h2>
+            <form id="actionForm">
+                <input type="hidden" id="modalTarget">
+                <input type="hidden" id="modalType">
+                
+                <div class="form-group" id="durationGroup" style="display:none;">
+                    <label>Czas trwania (np. 1h, 24h, zostaw puste dla perm) <span class="required">*</span></label>
+                    <input type="text" id="actionDuration" placeholder="24h" class="input-dark">
+                </div>
+
+                <div class="form-group">
+                    <label>Powód <span class="required">*</span></label>
+                    <textarea id="actionReason" rows="3" placeholder="Wpisz dokładny powód akcji..." required class="input-dark"></textarea>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-outline" onclick="closeModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-danger" id="btnConfirmAction">Potwierdź Akcję</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

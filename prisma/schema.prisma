@@ -134,3 +134,18 @@ model WantedPerson {
   messageId        String?  // ID wiadomości na kanale #poszukiwani
   createdAt        DateTime @default(now())
 }
+
+model WebSession {
+  token        String   @id
+  discordId    String
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
+}
+
+model ModerationShift {
+  id               String   @id @default(cuid())
+  moderatorId      String
+  startTime        DateTime @default(now())
+  endTime          DateTime?
+  durationMinutes  Int?
+}

@@ -1,0 +1,247 @@
+let sessionToken = '';
+let isShiftActive = false;
+let playersData = [];
+
+// DOM Elements
+const elApp = document.getElementById('app');
+const elLoader = document.getElementById('loader');
+const elShiftDot = document.querySelector('.status-dot');
+const elShiftText = document.getElementById('shiftStatusText');
+const elBtnShift = document.getElementById('btnToggleShift');
+const elPlayersList = document.getElementById('playersList');
+const elNoPlayers = document.getElementById('noPlayers');
+const elStatsPlayers = document.getElementById('statsPlayers');
+const elSearchInput = document.getElementById('searchInput');
+
+// Init
+window.addEventListener('DOMContentLoaded', async () => {
+    // Check URL for token
+    const urlParams = new URLSearchParams(window.location.search);
+    const tokenFromUrl = urlParams.get('token');
+    
+    if (tokenFromUrl) {
+        localStorage.setItem('panelToken', tokenFromUrl);
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    
+    sessionToken = localStorage.getItem('panelToken');
+    
+    if (!sessionToken) {
+        showErrorAuth('Brak autoryzacji. Użyj komendy /panel na Discordzie.');
+        return;
+    }
+
+    try {
+        await authenticate();
+        elLoader.style.display = 'none';
+        elApp.style.display = 'block';
+        
+        loadPlayers();
+        setInterval(loadPlayers, 120000); // 2 min auto-refresh
+    } catch (e) {
+        showErrorAuth('Sesja wygasła lub jest nieprawidłowa.');
+        localStorage.removeItem('panelToken');
+    }
+});
+
+// API Helper
+async function apiCall(endpoint, method = 'GET', body = null) {
+    const options = {
+        method,
+        headers: {
+            'Authorization': `Bearer ${sessionToken}`,
+            'Content-Type': 'application/json'
+        }
+    };
+    if (body) options.body = JSON.stringify(body);
+    
+    const res = await fetch(endpoint, options);
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'API Error');
+    }
+    return res.json();
+}
+
+function showErrorAuth(msg) {
+    elLoader.innerHTML = `<span style="font-size:3rem;margin-bottom:1rem">🚫</span><h3>Odmowa dostępu</h3><p>${msg}</p>`;
+}
+
+function showToast(msg, type = 'success') {
+    const container = document.getElementById('toastContainer');
+    const t = document.createElement('div');
+    t.className = `toast ${type}`;
+    t.innerHTML = `${type === 'success' ? '✅' : '❌'} ${msg}`;
+    container.appendChild(t);
+    setTimeout(() => {
+        t.style.opacity = '0';
+        setTimeout(() => t.remove(), 300);
+    }, 4000);
+}
+
+// Authentication
+async function authenticate() {
+    const user = await apiCall('/api/me');
+    document.getElementById('userName').textContent = user.username;
+    if (user.avatar) {
+        document.getElementById('userAvatar').src = user.avatar;
+    }
+    setShiftState(user.shiftActive);
+}
+
+function setShiftState(active) {
+    isShiftActive = active;
+    if (active) {
+        elShiftDot.classList.add('active');
+        elShiftText.textContent = 'Służba Aktywna';
+        elBtnShift.textContent = 'Zakończ Służbę';
+        elBtnShift.className = 'btn btn-outline';
+    } else {
+        elShiftDot.classList.remove('active');
+        elShiftText.textContent = 'Brak służby';
+        elBtnShift.textContent = 'Zacznij Służbę';
+        elBtnShift.className = 'btn btn-primary';
+    }
+}
+
+// Shift Toggle
+elBtnShift.addEventListener('click', async () => {
+    elBtnShift.disabled = true;
+    try {
+        if (isShiftActive) {
+            const res = await apiCall('/api/shift/stop', 'POST');
+            setShiftState(false);
+            showToast(`Służba zakończona. Czas: ${res.durationMinutes} min.`);
+        } else {
+            await apiCall('/api/shift/start', 'POST');
+            setShiftState(true);
+            showToast('Rozpoczęto służbę!');
+        }
+    } catch(e) {
+        showToast(e.message, 'error');
+    }
+    elBtnShift.disabled = false;
+});
+
+// Load Players
+async function loadPlayers() {
+    try {
+        const btnRef = document.getElementById('btnRefresh');
+        btnRef.style.transform = 'rotate(180deg)';
+        setTimeout(() => btnRef.style.transform = 'rotate(0deg)', 500);
+
+        playersData = await apiCall('/api/players');
+        document.getElementById('lastRefreshTime').textContent = `Zaktualizowano: ${new Date().toLocaleTimeString('pl-PL')}`;
+        elStatsPlayers.textContent = playersData.length;
+        renderPlayers();
+    } catch(e) {
+        showToast('Nie udało się załadować graczy: ' + e.message, 'error');
+    }
+}
+
+document.getElementById('btnRefresh').addEventListener('click', loadPlayers);
+
+elSearchInput.addEventListener('input', renderPlayers);
+
+function renderPlayers() {
+    const query = elSearchInput.value.toLowerCase();
+    const filtered = playersData.filter(p => p.nick.toLowerCase().includes(query));
+    
+    elPlayersList.innerHTML = '';
+    
+    if (filtered.length === 0) {
+        elPlayersList.parentElement.style.display = 'none';
+        elNoPlayers.style.display = 'block';
+        return;
+    }
+    
+    elPlayersList.parentElement.style.display = 'table';
+    elNoPlayers.style.display = 'none';
+
+    filtered.forEach(p => {
+        const tr = document.createElement('tr');
+        
+        // Avatar element
+        const avatarHtml = p.discordAvatar 
+            ? `<img src="${p.discordAvatar}" class="mini-avatar" title="Połączone konto Discord">` 
+            : `<div class="mini-avatar" title="Brak połączonego konta">👤</div>`;
+
+        tr.innerHTML = `
+            <td>
+                <div class="player-cell">
+                    ${avatarHtml}
+                    <span>${p.nick}</span>
+                </div>
+            </td>
+            <td><span class="role-badge">${p.permission}</span></td>
+            <td class="actions-col">
+                <div class="action-buttons">
+                    <button class="btn btn-warn btn-sm" onclick="openActionModal('warn', '${p.nick}')">Warn</button>
+                    <button class="btn btn-outline btn-sm" onclick="openActionModal('kick', '${p.nick}')">Kick</button>
+                    <button class="btn btn-danger btn-sm" onclick="openActionModal('ban', '${p.nick}')">Ban</button>
+                </div>
+            </td>
+        `;
+        elPlayersList.appendChild(tr);
+    });
+}
+
+// Modal Actions
+const modal = document.getElementById('actionModal');
+const mTitle = document.getElementById('modalTargetNick');
+const mTarget = document.getElementById('modalTarget');
+const mType = document.getElementById('modalType');
+const mReason = document.getElementById('actionReason');
+const mDurationGroup = document.getElementById('durationGroup');
+const mDuration = document.getElementById('actionDuration');
+const mBtn = document.getElementById('btnConfirmAction');
+
+window.openActionModal = (type, targetNick) => {
+    if (!isShiftActive && type !== 'log') {
+        showToast('Musisz być na służbie, aby moderować!', 'error');
+        return;
+    }
+    mType.value = type;
+    mTarget.value = targetNick || '';
+    mReason.value = '';
+    mDuration.value = '';
+    
+    if (type === 'log') {
+        document.getElementById('modalTitle').innerHTML = 'Utwórz <span class="highlight">Log Raport</span>';
+        mDurationGroup.style.display = 'none';
+        mBtn.textContent = 'Wyślij Log';
+        mBtn.className = 'btn btn-primary';
+    } else {
+        document.getElementById('modalTitle').innerHTML = `Wykonaj: <span style="text-transform:uppercase">${type}</span> na <span class="highlight">${targetNick}</span>`;
+        mDurationGroup.style.display = type === 'ban' ? 'block' : 'none';
+        mBtn.textContent = `Potwierdź ${type}`;
+        mBtn.className = type === 'ban' ? 'btn btn-danger' : (type === 'warn' ? 'btn btn-warn' : 'btn btn-outline');
+    }
+    
+    modal.style.display = 'flex';
+};
+
+window.openLogModal = () => openActionModal('log', 'Ogólny');
+
+window.closeModal = () => { modal.style.display = 'none'; };
+
+document.getElementById('actionForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const type = mType.value;
+    const targetNick = mTarget.value;
+    const reason = mReason.value;
+    const duration = mDuration.value;
+    
+    mBtn.disabled = true;
+    mBtn.textContent = 'Wysyłanie...';
+
+    try {
+        await apiCall('/api/action', 'POST', { type, targetNick, reason, duration });
+        showToast(`Akcja ${type.toUpperCase()} przebiegła pomyślnie.`);
+        closeModal();
+    } catch(err) {
+        showToast(err.message, 'error');
+    }
+    
+    mBtn.disabled = false;
+});
