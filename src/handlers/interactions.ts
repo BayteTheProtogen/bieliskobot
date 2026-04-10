@@ -410,6 +410,79 @@ export async function handleInteractions(interaction: Interaction) {
                 return;
             }
 
+            if (customId.startsWith('fish_review|') || customId.startsWith('fish_approve|') || customId.startsWith('fish_reject|')) {
+                const [action, targetIdOrRequestId] = customId.split('|');
+                const SPRAWDZANIE_RYB_CHANNEL_ID = '1492254600458408059';
+                if (interaction.channelId !== SPRAWDZANIE_RYB_CHANNEL_ID) return;
+
+                await interaction.deferUpdate();
+
+                if (action === 'fish_review') {
+                    const targetDiscordId = targetIdOrRequestId;
+                    const request = await (prisma as any).fishingRequest.findFirst({
+                        where: { discordId: targetDiscordId, status: 'PENDING' },
+                        orderBy: { createdAt: 'asc' }
+                    });
+
+                    if (!request) return interaction.editReply({ content: '❌ Brak oczekujących wniosków dla tego gracza.', embeds: [], components: [] });
+                    
+                    const { embed, components } = await getFishReviewUI(request);
+                    await interaction.editReply({ embeds: [embed], components });
+                    return;
+                }
+
+                if (action === 'fish_approve' || action === 'fish_reject') {
+                    const requestId = targetIdOrRequestId;
+                    const request = await (prisma as any).fishingRequest.findUnique({ where: { id: requestId } });
+                    if (!request || request.status !== 'PENDING') return interaction.editReply({ content: '❌ Wniosek już przetworzony lub nie istnieje.' });
+
+                    const targetDiscordId = request.discordId;
+
+                    if (action === 'fish_approve') {
+                        await prisma.$transaction([
+                            prisma.citizen.update({
+                                where: { discordId: targetDiscordId },
+                                data: { pocket: { increment: request.taxedAmount } }
+                            }),
+                            (prisma as any).fishingRequest.update({
+                                where: { id: requestId },
+                                data: { status: 'APPROVED' }
+                            })
+                        ]);
+
+                        try {
+                            const user = await interaction.client.users.fetch(targetDiscordId);
+                            if (user) await user.send(`✅ Twój wniosek o sprzedaż ryb (**${request.amount} zł** brutto) został zaakceptowany!\nOtrzymałeś **${request.taxedAmount.toLocaleString()} zł** (po podatku 40%) do kieszeni.`);
+                        } catch {}
+                    } else {
+                        await (prisma as any).fishingRequest.update({
+                            where: { id: requestId },
+                            data: { status: 'REJECTED' }
+                        });
+
+                        try {
+                            const user = await interaction.client.users.fetch(targetDiscordId);
+                            if (user) await user.send(`❌ Twój wniosek o sprzedaż ryb (**${request.amount} zł** brutto) został odrzucony przez administrację.`);
+                        } catch {}
+                    }
+
+                    // Załaduj kolejny wniosek tego samego gracza
+                    const nextRequest = await (prisma as any).fishingRequest.findFirst({
+                        where: { discordId: targetDiscordId, status: 'PENDING' },
+                        orderBy: { createdAt: 'asc' }
+                    });
+
+                    if (nextRequest) {
+                        const { embed: nextEmbed, components: nextComponents } = await getFishReviewUI(nextRequest);
+                        await interaction.editReply({ embeds: [nextEmbed], components: nextComponents });
+                    } else {
+                        await (prisma as any).fishingSummary.delete({ where: { discordId: targetDiscordId } }).catch(() => null);
+                        await interaction.editReply({ content: `✅ Zakończono sprawdzanie wniosków gracza <@${targetDiscordId}>. Wszystkie zostały przetworzone.`, embeds: [], components: [] });
+                    }
+                    return;
+                }
+            }
+
             if (customId.startsWith('urzad_reg_approve|') || customId.startsWith('urzad_reg_reject|')) {
                 const [action, pendingIdStr] = customId.split('|');
                 const pendingId = parseInt(pendingIdStr);
@@ -1739,4 +1812,31 @@ export async function handleInteractions(interaction: Interaction) {
             }
         }
     }
+}
+
+async function getFishReviewUI(request: any) {
+    const embed = new EmbedBuilder()
+        .setTitle(`👨‍⚖️ Weryfikacja: ${request.robloxNick}`)
+        .setDescription(`Wniosek od gracza <@${request.discordId}>\n\n` +
+                        `💰 **Suma Brutto:** ${request.amount.toLocaleString()} zł\n` +
+                        `💸 **Suma Netto (60%):** **${request.taxedAmount.toLocaleString()} zł**\n\n` +
+                        `📅 **Data:** <t:${Math.floor(request.createdAt.getTime() / 1000)}:f>`)
+        .setImage(request.screenshotUrl)
+        .setColor('#f39c12')
+        .setFooter({ text: `ID Wniosku: ${request.id}` });
+
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`fish_approve|${request.id}`)
+            .setLabel('Akceptuj i Wypłać')
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('✅'),
+        new ButtonBuilder()
+            .setCustomId(`fish_reject|${request.id}`)
+            .setLabel('Odrzuć')
+            .setStyle(ButtonStyle.Danger)
+            .setEmoji('❌')
+    );
+
+    return { embed, components: [row] };
 }

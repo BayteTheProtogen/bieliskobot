@@ -136,7 +136,7 @@ export const economyCommands = {
 export const workCommands = {
     data: new SlashCommandBuilder()
         .setName('praca')
-        .setDescription('Idź do pracy i zarób 2500 zł (Dostępne co 24h)'),
+        .setDescription('Idź do pracy i zarób od 2500 do 4200 zł w zależności od frakcji (Dostępne co 24h)'),
 
     async execute(interaction: ChatInputCommandInteraction) {
         const discordId = interaction.user.id;
@@ -146,10 +146,25 @@ export const workCommands = {
             return interaction.reply({ content: '🚫 Tylko zarejestrowani obywatele z dowodem mogą podjąć legalną pracę!', ephemeral: true });
         }
 
-        // Check for Civilian role Just In Case
         const member = await interaction.guild?.members.fetch(discordId);
         if (!member?.roles.cache.has('1490075447629971467')) {
              return interaction.reply({ content: '⚠️ Tylko certyfikowani obywatele z rangą **Cywil** mogą odszukać urząd pracy!', ephemeral: true });
+        }
+
+        // Frakcje i stawki
+        const rolesPay: { [key: string]: number } = {
+            '1490253667910029412': 4200, // Policjant
+            '1490253785962909847': 4000, // Ratownik medyczny
+            '1490253850957840464': 3800, // Pomoc drogowa
+            '1490253725405548704': 4200, // Strażak
+            '1492152371143512174': 3500  // Operator numeru ratunkowego 112
+        };
+
+        let earned = 2500; // Domyślna stawka Cywila
+        for (const [roleId, pay] of Object.entries(rolesPay)) {
+            if (member.roles.cache.has(roleId)) {
+                if (pay > earned) earned = pay;
+            }
         }
 
         const now = new Date();
@@ -168,10 +183,10 @@ export const workCommands = {
 
         await prisma.citizen.update({
             where: { discordId },
-            data: { pocket: { increment: 2500 }, lastWork: now }
+            data: { pocket: { increment: earned }, lastWork: now }
         });
 
-        return interaction.reply({ content: '🔨 Przepracowałeś swoją zmianę! Otrzymujesz **2 500 zł** bezpośrednio do kieszeni.' });
+        return interaction.reply({ content: `🔨 Przepracowałeś swoją zmianę! Jako rzetelny pracownik otrzymujesz **${earned.toLocaleString()} zł** bezpośrednio do kieszeni.` });
     }
 };
 

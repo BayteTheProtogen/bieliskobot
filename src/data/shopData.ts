@@ -58,6 +58,15 @@ export const SHOP_ITEMS: ShopItem[] = [
         roleId: '1490664549605572638', // To samo ID co dla 24h, zarządzanie datą i tak będzie leżało po stronie bazy
         durationHours: 168 // 7 * 24
     },
+    {
+        id: 'karta_rybacka',
+        name: 'Karta rybacka',
+        description: 'Dokument uprawniający do połowu ryb i sprzedaży ich w skupie.',
+        price: 7000,
+        category: 'legal',
+        type: 'LICENSE',
+        roleId: '1492254899558416554'
+    },
 
     // BROŃ (Kategoria 2)
     {

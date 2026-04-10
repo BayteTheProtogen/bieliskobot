@@ -16,14 +16,16 @@ import { rejestracjaCommand } from './commands/rejestracja';
 import { rejestracjaAdminCommands } from './commands/rejestracjaAdmin';
 import { poszukiwanieCommand } from './commands/poszukiwanie';
 import { panelCommand } from './commands/panel';
+import { rybyCommand } from './commands/ryby';
 import { erlcModeration } from './services/erlc';
 import { initVision } from './services/vision';
 import { generatePrisonerCard, generateArrestCard, generateKartotekaCard } from './services/canvas';
 import { prisma } from './services/db';
-import { EmbedBuilder, AttachmentBuilder, TextChannel, ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
-import { startERLCPolling } from './services/erlcPoller';
+import { TextChannel, ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
+import { startERLCPolling, startAutoUnbanJob } from './services/erlcPoller';
 import { BAN_ROOM_ID, finalizeAction } from './services/modActions';
 import { startWebServer } from './web/server';
+import { processModeratorConversation } from './services/dmModeration';
 
 dotenv.config();
 
@@ -78,7 +80,8 @@ client.once(Events.ClientReady, async () => {
                 rejestracjaCommand.data.toJSON(),
                 rejestracjaAdminCommands.data.toJSON(),
                 poszukiwanieCommand.data.toJSON(),
-                panelCommand.data.toJSON()
+                panelCommand.data.toJSON(),
+                rybyCommand.data.toJSON()
             ] },
         );
         console.log('Successfully reloaded application (/) commands.');
@@ -88,6 +91,7 @@ client.once(Events.ClientReady, async () => {
 
     // Start ERLC polling for in-game mod action detection
     startERLCPolling(client);
+    startAutoUnbanJob(client);
     
     // Uruchom WebUI API
     startWebServer(client, Number(process.env.PORT) || 3000);
@@ -218,6 +222,12 @@ client.on('interactionCreate', async interaction => {
                 return;
             }
             await logiCommand.execute(interaction);
+        } else if (interaction.commandName === 'ryby') {
+            if (interaction.channelId !== '1492254461467295774') {
+                await interaction.reply({ content: '🚫 Komendy `/ryby` można używać wyłącznie na wydzielonym kanale <#1492254461467295774>!', ephemeral: true });
+                return;
+            }
+            await rybyCommand.execute(interaction);
         }
     } else if (interaction.isButton()) {
         const customId = interaction.customId;
@@ -296,7 +306,15 @@ client.on('interactionCreate', async interaction => {
 });
 
 client.on(Events.MessageCreate, async message => {
-    if (message.author.bot || !message.content.startsWith('!bb ')) return;
+    if (message.author.bot) return;
+
+    // Obsługa konwersacji moderacyjnych w DM
+    if (!message.guild) {
+        const handled = await processModeratorConversation(client, message);
+        if (handled) return;
+    }
+
+    if (!message.content.startsWith('!bb ')) return;
 
     const ADMIN_CHANNEL_ID = '1490274396391211158';
     const OWNER_ROLE_ID = '1490053669830393996';

@@ -107,17 +107,38 @@ async function stopShift(client: Client, discordId: string, isAuto: boolean = fa
 
 export function startWebServer(client: Client, port: number = 3000) {
     // Background job for auto-closing shifts (every 1 min)
+    // Background job for auto-closing shifts (every 1 min) - TYMCZASOWO WYŁĄCZONE
+    /*
     setInterval(async () => {
-        const twentyMinAgo = new Date(Date.now() - 20 * 60 * 1000);
-        const inactiveSessions = await (prisma as any).webSession.findMany({
-            where: { lastHeartbeat: { lt: twentyMinAgo } }
-        });
+        const TIMEOUT_MIN = 15;
+        const threshold = new Date(Date.now() - TIMEOUT_MIN * 60 * 1000);
+        const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-        for (const session of inactiveSessions) {
-            await stopShift(client, session.discordId, true);
-            // Optionally clean up session if expired, but here we just manage the shift
+        try {
+            // 1. Cleanup very old sessions
+            await (prisma as any).webSession.deleteMany({ where: { lastHeartbeat: { lt: dayAgo } } });
+
+            // 2. Get all people on active shift
+            const onShift = await (prisma as any).moderationShift.findMany({ where: { endTime: null } });
+
+            for (const shift of onShift) {
+                // Check if this moderator has ANY session active within last 15 min
+                const sessionCount = await (prisma as any).webSession.count({
+                    where: { 
+                        discordId: shift.moderatorId,
+                        lastHeartbeat: { gte: threshold }
+                    }
+                });
+
+                if (sessionCount === 0) {
+                    await stopShift(client, shift.moderatorId, true);
+                }
+            }
+        } catch (e) {
+            console.error('[WebUI] Auto-close job error:', e);
         }
     }, 60 * 1000);
+    */
 
     const server = http.createServer(async (req, res) => {
         // CORS Headers

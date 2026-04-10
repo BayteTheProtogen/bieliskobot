@@ -150,3 +150,31 @@ model ModerationShift {
   endTime          DateTime?
   durationMinutes  Int?
 }
+
+model FishingRequest {
+  id             String   @id @default(cuid())
+  discordId      String
+  robloxNick     String
+  amount         Int
+  taxedAmount    Int
+  screenshotUrl  String
+  status         String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  createdAt      DateTime @default(now())
+
+  @@index([discordId])
+}
+
+model FishingSummary {
+  discordId String @id
+  messageId String
+}
+
+model BanConversation {
+  userId        String   @id
+  targetNick    String
+  action        String
+  erlcTimestamp Int
+  step          Int      @default(1) // 1: duration, 2: reason
+  tempDuration  String?
+  createdAt     DateTime @default(now())
+}
