@@ -42,14 +42,14 @@ window.addEventListener('DOMContentLoaded', async () => {
         setInterval(loadPlayers, 120000); // 2 min auto-refresh
         setInterval(loadActiveModerators, 60000); // 1 min refresh mods
         
-        // Heartbeat system (every 30s)
-        setInterval(async () => {
+        // Heartbeat system (Robust Web Worker to bypass background throttling)
+        const hbBlob = new Blob([`setInterval(() => postMessage('tick'), 30000);`], { type: 'text/javascript' });
+        const hbWorker = new Worker(URL.createObjectURL(hbBlob));
+        hbWorker.onmessage = () => {
             if (sessionToken) {
-                try { await apiCall('/api/heartbeat', 'POST'); } 
-                catch (e) { console.error('Heartbeat failure'); }
+                apiCall('/api/heartbeat', 'POST').catch(() => console.error('HB Fail'));
             }
-        }, 30000);
-
+        };
     } catch (e) {
         showErrorAuth('Sesja wygasła lub jest nieprawidłowa.');
         localStorage.removeItem('panelToken');

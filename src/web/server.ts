@@ -108,9 +108,9 @@ async function stopShift(client: Client, discordId: string, isAuto: boolean = fa
 export function startWebServer(client: Client, port: number = 3000) {
     // Background job for auto-closing shifts (every 1 min)
     setInterval(async () => {
-        const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+        const twentyMinAgo = new Date(Date.now() - 20 * 60 * 1000);
         const inactiveSessions = await (prisma as any).webSession.findMany({
-            where: { lastHeartbeat: { lt: fiveMinAgo } }
+            where: { lastHeartbeat: { lt: twentyMinAgo } }
         });
 
         for (const session of inactiveSessions) {
