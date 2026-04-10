@@ -192,8 +192,7 @@ export function startWebServer(client: Client, port: number = 3000) {
 
             if (req.method === 'GET' && pathname === '/api/moderators') {
                 const activeShifts = await (prisma as any).moderationShift.findMany({
-                    where: { endTime: null },
-                    include: { WebSession: true } // Assuming relation, if not we map manually
+                    where: { endTime: null }
                 });
                 
                 const mods = await Promise.all(activeShifts.map(async (s: any) => {
