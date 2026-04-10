@@ -63,7 +63,6 @@ export async function processModeratorConversation(client: Client, message: Mess
         }
 
         // Finalize
-        await message.channel.sendTyping();
         await finalizeAction(
             client, 
             message.author, 

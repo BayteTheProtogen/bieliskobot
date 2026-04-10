@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, REST, Routes, Events, Partials, MessageFlags } from 'discord.js';
+import { Client, GatewayIntentBits, REST, Routes, Events, Partials, MessageFlags, EmbedBuilder } from 'discord.js';
 import * as dotenv from 'dotenv';
 import { dowodCommand } from './commands/dowod';
 import { economyCommands, workCommands, extraWorkCommands } from './commands/economy';
