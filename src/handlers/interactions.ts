@@ -1,6 +1,6 @@
 import { Interaction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, AttachmentBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, UserSelectMenuInteraction, StringSelectMenuInteraction, StringSelectMenuBuilder, MessageFlags } from 'discord.js';
 import { prisma } from '../services/db';
-import { generateIDCard, generateFineCard, generateArrestCard, generateVehicleCard } from '../services/canvas';
+import { generateIDCard, generateFineCard, generateArrestCard, generateVehicleCard, generateReceiptCard } from '../services/canvas';
 import { getVehicleListPage, VehicleListType } from '../utils/vehicleList';
 import { getAvatarBust, getUserInfo } from '../services/roblox';
 import { logBotDM } from '../services/dmLogger';
@@ -756,25 +756,24 @@ export async function handleInteractions(interaction: Interaction) {
                         })
                     ]);
                     
-                    // Nadanie ról 
-                    if (item.roleId && interaction.guild) {
-                        try {
-                            const member = await interaction.guild.members.fetch(citizen.discordId);
-                            if (member && !member.roles.cache.has(item.roleId)) {
-                                await member.roles.add(item.roleId);
-                            }
-                        } catch (e) {
-                            console.error(`Nie udało się nadać roli ${item.roleId} graczowi ${citizen.discordId}:`, e);
-                        }
-                    }
+                    // Proceduralny Paragon (Graphic)
+                    const buffer = await generateReceiptCard({
+                        itemName: item.name,
+                        price: item.price,
+                        paymentMethod: isPocket ? 'Gotówka' : 'Karta Bankowa',
+                        citizenName: `${citizen.firstName} ${citizen.lastName}`,
+                        citizenNumber: citizen.citizenNumber,
+                        date: new Date().toLocaleString('pl-PL')
+                    });
+                    const attachment = new AttachmentBuilder(buffer, { name: 'paragon.png' });
 
                     const successEmbed = new EmbedBuilder()
-                        .setTitle(`✅ Zakupiono: ${item.name}`)
-                        .setDescription(`Opłata w wysokości **${item.price.toLocaleString()} zł** została pobrana z Twojej ${isPocket ? 'kieszeni' : 'karty bankowej'}.\nPrzedmiot znajduje się teraz w Twoim \`/ekwipunek\`.`)
+                        .setTitle('💼 Zakup udany!')
+                        .setDescription(`Pomyślnie kupiono przedmiot: **${item.name}**\nKwota: **${item.price.toLocaleString()} zł**\nMetoda: **${isPocket ? 'Gotówka' : 'Karta Bankowa'}**\n\nPrzedmiot znajduje się w Twoim ekwipunku (\`/ekwipunek\`).`)
+                        .setImage('attachment://paragon.png')
                         .setColor('#2ecc71');
 
-                    await interaction.editReply({ content: '', embeds: [successEmbed], components: [] });
-                    
+                    return interaction.editReply({ embeds: [successEmbed], files: [attachment], components: [] });
                 } catch (e) {
                     console.error('Błąd podczas zakupu', e);
                     await interaction.editReply({ content: '🚫 Wystąpił krytyczny błąd bazy danych podczas zakupu!', embeds: [], components: [] });

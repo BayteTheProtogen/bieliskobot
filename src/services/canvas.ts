@@ -1147,3 +1147,132 @@ export async function generateWantedPoster(nick: string, reason: string, avatarU
 
     return canvas.toBuffer('image/png');
 }
+
+export interface ReceiptData {
+    itemName: string;
+    price: number;
+    paymentMethod: 'Gotówka' | 'Karta Bankowa';
+    citizenName: string;
+    citizenNumber: string;
+    date: string;
+}
+
+export async function generateReceiptCard(data: ReceiptData): Promise<Buffer> {
+    const width = 400;
+    const height = 600;
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+
+    // 1. TŁO - Papier termicznyowa taśma
+    ctx.fillStyle = '#f9fafb';
+    ctx.fillRect(0, 0, width, height);
+
+    // Tekstura papieru
+    ctx.fillStyle = 'rgba(0,0,0,0.02)';
+    for(let i=0; i<300; i++) {
+        ctx.fillRect(Math.random()*width, Math.random()*height, 2, 2);
+    }
+
+    // Ząbkowane brzegi (Góra i Dół)
+    ctx.fillStyle = '#ffffff'; // Kolor tła pod paragonem (np. tło Discorda)
+    const toothSize = 10;
+    for (let x = 0; x <= width; x += toothSize * 2) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x + toothSize, toothSize);
+        ctx.lineTo(x + toothSize * 2, 0);
+        ctx.fill();
+        
+        ctx.beginPath();
+        ctx.moveTo(x, height);
+        ctx.lineTo(x + toothSize, height - toothSize);
+        ctx.lineTo(x + toothSize * 2, height);
+        ctx.fill();
+    }
+
+    // 2. NAGŁÓWEK SKLEPU
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#1f2937';
+    ctx.font = 'bold 28px Roboto';
+    ctx.fillText('BIELISKO MARKET', width / 2, 80);
+    
+    ctx.font = '12px SpaceMono';
+    ctx.fillText('NIP: 521-384-XX-XX | STOISKO: 01', width / 2, 105);
+    ctx.fillText('-----------------------------------', width / 2, 125);
+
+    // 3. DANE TRANSAKCJI
+    ctx.textAlign = 'left';
+    const startX = 40;
+    let currentY = 160;
+
+    const drawLine = (label: string, value: string, fontLabel = '14px Roboto', fontValue = 'bold 16px Roboto') => {
+        ctx.fillStyle = '#6b7280';
+        ctx.font = fontLabel;
+        ctx.fillText(label, startX, currentY);
+        
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#111827';
+        ctx.font = fontValue;
+        ctx.fillText(value, width - startX, currentY);
+        ctx.textAlign = 'left';
+        currentY += 40;
+    };
+
+    drawLine('DATA I GODZINA:', data.date, '12px Roboto', '14px RobotoBold');
+    drawLine('KLIENT:', data.citizenName, '12px Roboto', '14px RobotoBold');
+    drawLine('ID OBYWATELA:', data.citizenNumber, '12px Roboto', '14px RobotoBold');
+    
+    ctx.fillText('-----------------------------------', startX, currentY);
+    ctx.textAlign = 'center';
+    ctx.fillText('-----------------------------------', width / 2, currentY);
+    currentY += 40;
+
+    // POZYCJA
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#111827';
+    ctx.font = 'bold 18px Roboto';
+    ctx.fillText(data.itemName.toUpperCase(), startX, currentY);
+    
+    ctx.textAlign = 'right';
+    ctx.fillText(`${data.price.toLocaleString()} ZŁ`, width - startX, currentY);
+    currentY += 60;
+
+    // SUMA
+    ctx.textAlign = 'center';
+    ctx.fillText('-----------------------------------', width / 2, currentY);
+    currentY += 40;
+
+    ctx.textAlign = 'left';
+    ctx.font = 'bold 24px Roboto';
+    ctx.fillText('SUMA:', startX, currentY);
+    ctx.textAlign = 'right';
+    ctx.fillText(`${data.price.toLocaleString()} ZŁ`, width - startX, currentY);
+    currentY += 50;
+
+    drawLine('PŁATNOŚĆ:', data.paymentMethod, '14px Roboto', 'bold 16px Roboto');
+
+    // 4. STOPKA I KOD KRESKOWY
+    currentY += 20;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#6b7280';
+    ctx.font = 'italic 14px Roboto';
+    ctx.fillText('Dziękujemy za zakupy!', width / 2, currentY);
+    currentY += 40;
+
+    // Proceduralny kod kreskowy
+    const barX = 80;
+    const barWidth = width - 160;
+    const barHeight = 40;
+    ctx.fillStyle = '#111827';
+    for (let i = 0; i < barWidth; i += Math.random() * 4 + 1) {
+        if (Math.random() > 0.3) {
+            const w = Math.random() * 3 + 1;
+            ctx.fillRect(barX + i, currentY, w, barHeight);
+        }
+    }
+    currentY += barHeight + 15;
+    ctx.font = '10px SpaceMono';
+    ctx.fillText(`TRX-${Math.floor(Math.random() * 1000000).toString().padStart(7, '0')}`, width / 2, currentY);
+
+    return canvas.toBuffer('image/png');
+}
