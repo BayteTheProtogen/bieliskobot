@@ -1318,3 +1318,135 @@ export async function generateReceiptCard(data: ReceiptData): Promise<Buffer> {
 
     return canvas.toBuffer('image/png');
 }
+
+export async function generateSummonsCard(data: SummonsData): Promise<Buffer> {
+    const width = 800;
+    const height = 450;
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+
+    // 1. TŁO - Nowoczesny, techniczny styl (Ciemny granat + pomarańcz)
+    const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+    bgGrad.addColorStop(0, '#1a1c23');
+    bgGrad.addColorStop(1, '#111317');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, width, height);
+
+    // 2. PROCEDURALNE ELEMENTY TŁA
+    ctx.strokeStyle = 'rgba(243, 156, 18, 0.05)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < width; i += 40) {
+        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, height); ctx.stroke();
+    }
+    for (let i = 0; i < height; i += 40) {
+        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(width, i); ctx.stroke();
+    }
+
+    // Dodanie akcentu bocznego (ostrzegawczego)
+    ctx.fillStyle = '#f39c12';
+    ctx.fillRect(0, 0, 15, height);
+
+    // 3. NAGŁÓWEK
+    ctx.fillStyle = '#f39c12';
+    ctx.font = 'bold 32px Roboto';
+    ctx.fillText('OFICJALNE WEZWANIE', 45, 60);
+    
+    ctx.fillStyle = '#e67e22';
+    ctx.font = 'bold 14px Roboto';
+    ctx.fillText('URZĄD ADMINISTRACJI BIELISKO - SEKCJA DYSCYPLINARNA', 45, 85);
+
+    // Pasek dekoracyjny pod nagłówkiem
+    ctx.fillRect(45, 105, width - 90, 4);
+
+    // 4. AVATAR (Jeśli podany)
+    const contentX = 260;
+    if (data.avatarUrl) {
+        try {
+            const avatar = await loadImage(data.avatarUrl);
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(135, 230, 80, 0, Math.PI * 2);
+            ctx.clip();
+            ctx.drawImage(avatar, 55, 150, 160, 160);
+            ctx.restore();
+            
+            // Ramka avatara
+            ctx.strokeStyle = '#f39c12';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(135, 230, 80, 0, Math.PI * 2);
+            ctx.stroke();
+        } catch (e) {
+            console.error('Error loading avatar for summons:', e);
+        }
+    } else {
+        // Placeholder avatara
+        ctx.fillStyle = '#2d3436';
+        ctx.beginPath();
+        ctx.arc(135, 230, 80, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#f39c12';
+        ctx.font = 'bold 50px Roboto';
+        ctx.textAlign = 'center';
+        ctx.fillText('?', 135, 248);
+        ctx.textAlign = 'left';
+    }
+
+    // 5. DANE WEZWANIA
+    const drawField = (label: string, value: string, y: number) => {
+        ctx.fillStyle = '#636e72';
+        ctx.font = 'bold 12px Roboto';
+        ctx.fillText(label.toUpperCase(), contentX, y);
+        
+        ctx.fillStyle = '#dfe6e9';
+        ctx.font = '24px RobotoBold';
+        ctx.fillText(value, contentX, y + 30);
+    };
+
+    drawField('Osoba wezwana (Roblox)', data.targetNick, 160);
+    drawField('Administrator wzywający', data.adminName, 250);
+    drawField('Data i godzina wezwania', data.date, 340);
+
+    // 6. OSTRZEŻENIE
+    ctx.fillStyle = 'rgba(231, 76, 60, 0.15)';
+    ctx.fillRect(width - 320, 140, 280, 180);
+    ctx.strokeStyle = '#e74c3c';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(width - 320, 140, 280, 180);
+
+    ctx.fillStyle = '#e74c3c';
+    ctx.font = 'bold 16px Roboto';
+    ctx.textAlign = 'center';
+    ctx.fillText('! OSTRZEŻENIE !', width - 180, 175);
+    
+    ctx.fillStyle = '#dfe6e9';
+    ctx.font = '13px Roboto';
+    const warnLines = [
+        'Masz 5 minut na stawienie się',
+        'na kanale głosowym (VC).',
+        '',
+        'Niezastosowanie się do wezwania',
+        'będzie skutkować BANEM.'
+    ];
+    warnLines.forEach((line, i) => {
+        ctx.fillText(line, width - 180, 210 + (i * 20));
+    });
+    ctx.textAlign = 'left';
+
+    // 7. PIECZĘĆ PROCEDURALNA
+    ctx.save();
+    ctx.translate(width - 100, height - 80);
+    ctx.rotate(-0.2);
+    ctx.globalAlpha = 0.6;
+    ctx.strokeStyle = '#f39c12';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(0, 0, 50, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, 42, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#f39c12';
+    ctx.font = 'bold 18px Roboto';
+    ctx.textAlign = 'center';
+    ctx.fillText('ADMIN', 0, 8);
+    ctx.restore();
+
+    return canvas.toBuffer('image/png');
+}
