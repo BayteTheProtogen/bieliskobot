@@ -1,6 +1,7 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits, AttachmentBuilder } from 'discord.js';
 import { prisma } from '../services/db';
 import { executeERLCCommand } from '../services/erlc';
+import { generateSummonsCard } from '../services/canvas';
 
 const CALL_CHANNEL_ID = '1490073424779804873';
 const VC_CHANNEL_ID = '1492547567626752140';
@@ -32,15 +33,17 @@ export const wezwijCommand = {
         }
 
         const targetNick = interaction.options.getString('gracz', true);
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ ephemeral: false });
 
         try {
             // 3. ERLC PM
             const erlcMsg = `Wezwanie od Administracji! Masz 5 min na wejscie na VC na decek. Brak stawiennictwa = BAN.`;
             const erlcResult = await executeERLCCommand(`:pm ${targetNick} ${erlcMsg}`);
 
-            // 4. Discord DM
+            // 4. Discord DM & Graphic
             let dmStatus = 'Nie znaleziono konta Discord (brak DM)';
+            let avatarUrl: string | null = null;
+
             const citizen = await (prisma as any).citizen.findFirst({
                 where: { robloxNick: { equals: targetNick, mode: 'insensitive' } }
             });
@@ -48,6 +51,7 @@ export const wezwijCommand = {
             if (citizen) {
                 const targetUser = await interaction.client.users.fetch(citizen.discordId).catch(() => null);
                 if (targetUser) {
+                    avatarUrl = targetUser.displayAvatarURL({ size: 256, extension: 'png' });
                     const embed = new EmbedBuilder()
                         .setTitle('⚠️ OFICJALNE WEZWANIE')
                         .setDescription(`Zostałeś wezwany przez administratora **${interaction.user.username}**!\n\nMasz **5 minut** na dołączenie do kanału głosowego. BRAK STAWINNICTWA MOŻE SKUTKOWAĆ BANEM.`)
@@ -70,7 +74,16 @@ export const wezwijCommand = {
                 }
             }
 
-            // 5. Logging
+            // 5. Generate Procedural Graphic
+            const cardBuffer = await generateSummonsCard({
+                targetNick: targetNick,
+                adminName: interaction.user.username,
+                date: new Date().toLocaleString('pl-PL'),
+                avatarUrl: avatarUrl
+            });
+            const attachment = new AttachmentBuilder(cardBuffer, { name: 'wezwanie.png' });
+
+            // 6. Logging
             const logChannel = await interaction.client.channels.fetch(LOG_WWW_CHANNEL).catch(() => null);
             if (logChannel && logChannel.isTextBased()) {
                 const logEmbed = new EmbedBuilder()
@@ -86,7 +99,8 @@ export const wezwijCommand = {
             }
 
             await interaction.editReply({ 
-                content: `✅ Wezwano gracza **${targetNick}**.\nERLC: ${erlcResult.success ? '✅' : '❌ ' + erlcResult.error}\nDiscord: ${dmStatus}` 
+                content: `🔔 **OFICJALNE WEZWANIE OBYWATELA**\nERLC: ${erlcResult.success ? '✅' : '❌ ' + erlcResult.error}\nDiscord: ${dmStatus}`,
+                files: [attachment]
             });
 
         } catch (err: any) {

@@ -642,6 +642,13 @@ export interface ArrestData {
     date: string;
 }
 
+export interface SummonsData {
+    targetNick: string;
+    adminName: string;
+    date: string;
+    avatarUrl?: string | null;
+}
+
 export async function generateArrestCard(data: ArrestData): Promise<Buffer> {
     const width = 600;
     const height = 800;
