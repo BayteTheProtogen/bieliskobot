@@ -87,7 +87,7 @@ client.once(Events.ClientReady, async () => {
                 panelCommand.data.toJSON(),
                 rybyCommand.data.toJSON(),
                 dyzuryCommand.data.toJSON(),
-                wezwij_1.wezwijCommand.data.toJSON(),
+                wezwijCommand.data.toJSON(),
                 rpStartCommand.data.toJSON(),
                 rpStopCommand.data.toJSON()
             ] },
