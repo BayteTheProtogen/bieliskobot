@@ -3,6 +3,7 @@ let isShiftActive = false;
 let playersData = [];
 let currentModTab = 'me';
 let currentServerTab = 'kills';
+let lastModCallTimestamp = 0;
 
 // DOM Elements
 const elApp = document.getElementById('app');
@@ -14,6 +15,7 @@ const elPlayersList = document.getElementById('playersList');
 const elNoPlayers = document.getElementById('noPlayers');
 const elStatsPlayers = document.getElementById('statsPlayers');
 const elSearchInput = document.getElementById('searchInput');
+const elBtnBreak = document.getElementById('btnBreak');
 
 // Init
 window.addEventListener('DOMContentLoaded', async () => {
@@ -42,6 +44,20 @@ window.addEventListener('DOMContentLoaded', async () => {
         loadActiveModerators();
         loadModerationLogs();
         loadServerLogs();
+
+        // Volume logic
+        const savedVolume = localStorage.getItem('panelVolume');
+        const notifySound = document.getElementById('notifySound');
+        const volumeSlider = document.getElementById('volumeSlider');
+        if (savedVolume !== null) {
+            notifySound.volume = parseFloat(savedVolume);
+            volumeSlider.value = savedVolume;
+        }
+        volumeSlider.addEventListener('input', (e) => {
+            const vol = e.target.value;
+            notifySound.volume = vol;
+            localStorage.setItem('panelVolume', vol);
+        });
 
         setInterval(loadPlayers, 120000); // 2 min auto-refresh
         setInterval(loadActiveModerators, 60000); // 1 min refresh mods
@@ -144,7 +160,7 @@ async function authenticate() {
     if (user.avatar) {
         document.getElementById('userAvatar').src = user.avatar;
     }
-    setShiftState(user.shiftActive);
+    setShiftState(user.shiftActive, user.isOnBreak);
 }
 
 // Moderation Logs
@@ -198,14 +214,46 @@ window.switchModTab = (tab) => {
 // Server Logs (Kill & Commands)
 async function loadServerLogs() {
     try {
-        const [kills, commands] = await Promise.all([
+        const [kills, commands, modcalls] = await Promise.all([
             apiCall('/api/logs/server/kills'),
-            apiCall('/api/logs/server/commands')
+            apiCall('/api/logs/server/commands'),
+            apiCall('/api/logs/server/modcalls')
         ]);
         renderKillLogs(kills);
         renderCommandLogs(commands);
+        checkNewModCalls(modcalls);
     } catch (e) {
         console.error('Failed to load server logs');
+    }
+}
+
+function checkNewModCalls(modcalls) {
+    if (!modcalls || modcalls.length === 0) return;
+    
+    // Sort by timestamp asc to process in order
+    const sorted = [...modcalls].sort((a, b) => a.Timestamp - b.Timestamp);
+    
+    // If it's the first load, just set the initial timestamp
+    if (lastModCallTimestamp === 0) {
+        lastModCallTimestamp = sorted[sorted.length - 1].Timestamp;
+        return;
+    }
+
+    let foundNew = false;
+    for (const call of sorted) {
+        if (call.Timestamp > lastModCallTimestamp) {
+            foundNew = true;
+            lastModCallTimestamp = call.Timestamp;
+            showToast(`🚨 WEZWANIE POMOCY: ${call.Caller}`, 'error');
+        }
+    }
+
+    if (foundNew) {
+        const sound = document.getElementById('notifySound');
+        if (sound) {
+            sound.currentTime = 0;
+            sound.play().catch(e => console.warn('Browser blocked auto-play sound:', e));
+        }
     }
 }
 
@@ -248,20 +296,52 @@ window.switchServerTab = (tab) => {
     loadServerLogs();
 };
 
-function setShiftState(active) {
+function setShiftState(active, onBreak = false) {
     isShiftActive = active;
     if (active) {
         elShiftDot.classList.add('active');
-        elShiftText.textContent = 'Służba Aktywna';
+        elShiftDot.classList.toggle('break', onBreak);
+        elShiftText.textContent = onBreak ? 'Na przerwie' : 'Służba Aktywna';
         elBtnShift.textContent = 'Zakończ Służbę';
         elBtnShift.className = 'btn btn-outline';
+        
+        elBtnBreak.style.display = 'inline-block';
+        elBtnBreak.textContent = onBreak ? 'Wznów' : 'Przerwa';
+        elBtnBreak.className = onBreak ? 'btn btn-primary' : 'btn btn-outline btn-break';
+        
+        // Disable/Enable action buttons based on break state
+        document.querySelectorAll('.actions-col button').forEach(b => b.disabled = onBreak);
+        document.querySelector('.btn-log')?.setAttribute('disabled', onBreak);
+        if (onBreak) {
+            document.querySelector('.btn-log')?.classList.add('disabled');
+        } else {
+            document.querySelector('.btn-log')?.classList.remove('disabled');
+        }
+
     } else {
-        elShiftDot.classList.remove('active');
+        elShiftDot.classList.remove('active', 'break');
         elShiftText.textContent = 'Brak służby';
         elBtnShift.textContent = 'Zacznij Służbę';
         elBtnShift.className = 'btn btn-primary';
+        elBtnBreak.style.display = 'none';
+        
+        document.querySelectorAll('.actions-col button').forEach(b => b.disabled = true);
+        document.querySelector('.btn-log')?.setAttribute('disabled', 'true');
     }
 }
+
+// Break Toggle
+elBtnBreak.addEventListener('click', async () => {
+    elBtnBreak.disabled = true;
+    try {
+        const res = await apiCall('/api/shift/break', 'POST');
+        setShiftState(true, res.isOnBreak);
+        showToast(res.isOnBreak ? 'Rozpoczęto przerwę. Akcje zablokowane.' : 'Wrócono z przerwy. Akcje odblokowane.');
+    } catch(e) {
+        showToast(e.message, 'error');
+    }
+    elBtnBreak.disabled = false;
+});
 
 // Shift Toggle
 elBtnShift.addEventListener('click', async () => {
@@ -270,7 +350,7 @@ elBtnShift.addEventListener('click', async () => {
         if (isShiftActive) {
             const res = await apiCall('/api/shift/stop', 'POST');
             setShiftState(false);
-            showToast(`Służba zakończona. Czas: ${res.durationMinutes} min.`);
+            showToast(`Służba zakończona. Czas pracy: ${res.duration} min.`);
         } else {
             await apiCall('/api/shift/start', 'POST');
             setShiftState(true);

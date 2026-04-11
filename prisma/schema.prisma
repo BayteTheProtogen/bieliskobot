@@ -149,6 +149,8 @@ model ModerationShift {
   startTime        DateTime @default(now())
   endTime          DateTime?
   durationMinutes  Int?
+  totalBreakMinutes Int     @default(0)
+  currentBreakStart DateTime?
 }
 
 model FishingRequest {

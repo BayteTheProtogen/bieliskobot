@@ -118,16 +118,31 @@ async function stopShift(client: Client, discordId: string, isAuto: boolean = fa
     if (!existing) return null;
 
     const endTime = new Date();
+    
+    // 1. Zamykamy trwającą przerwę jeśli istnieje
+    let totalBreaks = existing.totalBreakMinutes || 0;
+    if (existing.currentBreakStart) {
+        const breakMs = endTime.getTime() - existing.currentBreakStart.getTime();
+        totalBreaks += Math.round(breakMs / 60000);
+    }
+
+    // 2. Wyliczamy czas (ShiftDuration - Breaks)
     const diffMs = endTime.getTime() - existing.startTime.getTime();
-    const durationMinutes = Math.round(diffMs / 60000);
+    let durationMinutes = Math.round(diffMs / 60000);
+    durationMinutes = Math.max(0, durationMinutes - totalBreaks);
 
     await (prisma as any).moderationShift.update({
         where: { id: existing.id },
-        data: { endTime, durationMinutes }
+        data: { 
+            endTime, 
+            durationMinutes,
+            totalBreakMinutes: totalBreaks,
+            currentBreakStart: null
+        }
     });
 
     await sendShiftReport(client, discordId, durationMinutes, existing.startTime, endTime, isAuto);
-    await logActionToDiscord(client, discordId, 'Koniec dyżuru', `Zakończono dyżur po **${durationMinutes}** minutach.${isAuto ? ' *(Automatycznie)*' : ''}`, isAuto ? '#e67e22' : '#95a5a6');
+    await logActionToDiscord(client, discordId, 'Koniec dyżuru', `Zakończono dyżur po **${durationMinutes}** minutach pracy (odliczono przerwy).${isAuto ? ' *(Automatycznie)*' : ''}`, isAuto ? '#e67e22' : '#95a5a6');
 
     return durationMinutes;
 }
@@ -233,7 +248,9 @@ export function startWebServer(client: Client, port: number = 3000) {
                 res.end(JSON.stringify({ 
                     id: session!.discordId, username: user?.username || 'Unknown', 
                     avatar: user?.displayAvatarURL({ extension: 'png' }) || null,
-                    shiftActive: !!shift, shiftStart: shift?.startTime || null
+                    shiftActive: !!shift, 
+                    shiftStart: shift?.startTime || null,
+                    isOnBreak: !!shift?.currentBreakStart
                 }));
                 return;
             }
@@ -272,6 +289,38 @@ export function startWebServer(client: Client, port: number = 3000) {
                 const duration = await stopShift(client, session!.discordId);
                 if (duration === null) { res.writeHead(400); return res.end(JSON.stringify({ error: 'Brak aktywnej służby' })); }
                 res.writeHead(200); return res.end(JSON.stringify({ success: true, duration }));
+            }
+
+            if (req.method === 'POST' && pathname === '/api/shift/break') {
+                const shift = await (prisma as any).moderationShift.findFirst({
+                    where: { moderatorId: session!.discordId, endTime: null }
+                });
+                if (!shift) { res.writeHead(400); return res.end(JSON.stringify({ error: 'Brak aktywnej służby' })); }
+
+                if (!shift.currentBreakStart) {
+                    // Start break
+                    await (prisma as any).moderationShift.update({
+                        where: { id: shift.id },
+                        data: { currentBreakStart: new Date() }
+                    });
+                    await logActionToDiscord(client, session!.discordId, 'Przerwa', 'Użytkownik udał się na przerwę.', '#f1c40f');
+                    res.writeHead(200); return res.end(JSON.stringify({ isOnBreak: true }));
+                } else {
+                    // End break
+                    const now = new Date();
+                    const diffMs = now.getTime() - shift.currentBreakStart.getTime();
+                    const breakMin = Math.round(diffMs / 60000);
+                    
+                    await (prisma as any).moderationShift.update({
+                        where: { id: shift.id },
+                        data: { 
+                            totalBreakMinutes: (shift.totalBreakMinutes || 0) + breakMin,
+                            currentBreakStart: null
+                        }
+                    });
+                    await logActionToDiscord(client, session!.discordId, 'Powrót z przerwy', `Użytkownik wrócił z przerwy (trwała ${breakMin} min).`, '#2ecc71');
+                    res.writeHead(200); return res.end(JSON.stringify({ isOnBreak: false }));
+                }
             }
 
             if (req.method === 'GET' && pathname === '/api/players') {
@@ -326,6 +375,12 @@ export function startWebServer(client: Client, port: number = 3000) {
                 const logs = await getKillLogs();
                 res.writeHead(200); return res.end(JSON.stringify(logs.slice(0, 20)));
             }
+            
+            if (req.method === 'GET' && pathname === '/api/logs/server/modcalls') {
+                const { getModCalls } = require('../services/erlc');
+                const logs = await getModCalls();
+                res.writeHead(200); return res.end(JSON.stringify(logs.slice(0, 10)));
+            }
 
             if (req.method === 'POST' && pathname === '/api/action') {
                 const body = await parseJSONBody(req);
@@ -336,6 +391,7 @@ export function startWebServer(client: Client, port: number = 3000) {
                     where: { moderatorId: session!.discordId, endTime: null }
                 });
                 if (!shift) { res.writeHead(403); return res.end(JSON.stringify({ error: 'Musisz rozpocząć służbę!' })); }
+                if (shift.currentBreakStart) { res.writeHead(403); return res.end(JSON.stringify({ error: 'Nie możesz wykonywać akcji podczas przerwy!' })); }
 
                 let commandStr = '';
                 let hours = null;

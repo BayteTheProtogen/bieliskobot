@@ -15,6 +15,20 @@ export interface CitizenData {
     citizenNumber: string;
 }
 
+export interface SummonsData {
+    targetNick: string;
+    adminName: string;
+    date: string;
+    avatarUrl?: string | null;
+}
+
+export interface RPStartData {
+    hostName: string;
+    location: string;
+    info: string;
+    date: string;
+}
+
 export async function generateIDCard(data: CitizenData, avatarUrl: string): Promise<Buffer> {
     const width = 856;
     const height = 540;
@@ -210,7 +224,7 @@ export async function generateIDCard(data: CitizenData, avatarUrl: string): Prom
     ctx.fillText(mrzLine1, 60, mrzY + 40);
     ctx.fillText(mrzLine2, 60, mrzY + 75);
 
-    // 9. STEMPEL "OSADZONY" (Jeśli zbanowany)
+    // 9. STEMPEL "BAN" (Jeśli zbanowany)
     const now = new Date();
     // @ts-ignore
     const isTempBanned = data.bannedUntil && new Date(data.bannedUntil) > now;
@@ -231,7 +245,7 @@ export async function generateIDCard(data: CitizenData, avatarUrl: string): Prom
         ctx.font = 'bold 70px Roboto';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('OSADZONY', 0, 0);
+        ctx.fillText('BAN', 0, 0);
 
         // Lekki efekt "zużycia" stempla (proceduralnie)
         ctx.globalAlpha = 0.2;
@@ -303,7 +317,7 @@ export async function generatePrisonerCard(avatarUrl: string): Promise<Buffer> {
     ctx.lineTo(width, height * 0.75);
     ctx.stroke();
 
-    // 3. STEMPEL "OSADZONY" (Bardziej wyrazisty)
+    // 3. STEMPEL "BAN" (Bardziej wyrazisty)
     ctx.save();
     ctx.translate(width / 2, height / 2);
     ctx.rotate(-0.2);
@@ -318,7 +332,7 @@ export async function generatePrisonerCard(avatarUrl: string): Promise<Buffer> {
     ctx.font = 'bold 100px Roboto';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('OSADZONY', 0, 0);
+    ctx.fillText('BAN', 0, 0);
     ctx.restore();
 
     return canvas.toBuffer('image/png');
@@ -642,12 +656,6 @@ export interface ArrestData {
     date: string;
 }
 
-export interface SummonsData {
-    targetNick: string;
-    adminName: string;
-    date: string;
-    avatarUrl?: string | null;
-}
 
 export async function generateArrestCard(data: ArrestData): Promise<Buffer> {
     const width = 600;
@@ -1514,6 +1522,84 @@ export async function generateSummonsCard(data: SummonsData): Promise<Buffer> {
     ctx.textAlign = 'center';
     ctx.fillText('ADMIN', 0, 8);
     ctx.restore();
+    return canvas.toBuffer('image/png');
+}
+
+export async function generateRPStartCard(data: RPStartData): Promise<Buffer> {
+    const width = 1000;
+    const height = 600;
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+
+    // 1. TŁO - Głęboka czerń z teksturą
+    ctx.fillStyle = '#0a0b0d';
+    ctx.fillRect(0, 0, width, height);
+
+    // Dynamiczne linie tła
+    ctx.strokeStyle = 'rgba(231, 76, 60, 0.05)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < width * 1.5; i += 40) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i - height, height);
+        ctx.stroke();
+    }
+
+    // 2. GRADIENT BOCZNY (Agresywna czerwień)
+    const grad = ctx.createLinearGradient(0, 0, 300, 0);
+    grad.addColorStop(0, '#6e1d1d');
+    grad.addColorStop(1, 'transparent');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 300, height);
+
+    // 3. NAGŁÓWEK
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 84px RobotoBold';
+    ctx.textAlign = 'left';
+    ctx.fillText('SESJA', 60, 150);
+    
+    ctx.fillStyle = '#e74c3c';
+    ctx.fillText('ROZPOCZĘTA', 60, 240);
+
+    // Pasek dekoracyjny
+    ctx.fillStyle = '#e74c3c';
+    ctx.fillRect(60, 270, 400, 8);
+
+    // 4. DANE SESJI
+    const drawInfo = (label: string, value: string, y: number) => {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.font = 'bold 16px Roboto';
+        ctx.fillText(label.toUpperCase(), 60, y);
+        
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '32px SpaceMono';
+        ctx.fillText(value, 60, y + 45);
+    };
+
+    drawInfo('Host Sesji', data.hostName, 340);
+    drawInfo('Miejsce Zbiórki', data.location || 'Brak danych', 440);
+    drawInfo('Data i Godzina', data.date, 540);
+
+    // 5. EMBLEMAT (Pieczęć Administracji)
+    ctx.save();
+    ctx.translate(width - 200, height / 2);
+    ctx.globalAlpha = 0.2;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 10;
+    ctx.beginPath(); ctx.arc(0, 0, 150, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, 130, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 40px Roboto';
+    ctx.textAlign = 'center';
+    ctx.fillText('OFFICIAL', 0, -10);
+    ctx.fillText('RP SESSION', 0, 40);
+    ctx.restore();
+
+    // 6. STOPKA
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.font = '12px SpaceMono';
+    ctx.textAlign = 'right';
+    ctx.fillText('BIELISKO ROLEPLAY // SYSTEM AUTOMATYCZNY // 2026', width - 40, height - 30);
 
     return canvas.toBuffer('image/png');
 }

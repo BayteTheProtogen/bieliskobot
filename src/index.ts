@@ -19,6 +19,7 @@ import { panelCommand } from './commands/panel';
 import { rybyCommand } from './commands/ryby';
 import { dyzuryCommand } from './commands/dyzury';
 import { wezwijCommand } from './commands/wezwij';
+import { rpStartCommand } from './commands/rp-start';
 import { erlcModeration } from './services/erlc';
 import { initVision } from './services/vision';
 import { generatePrisonerCard, generateArrestCard, generateKartotekaCard } from './services/canvas';
@@ -85,7 +86,8 @@ client.once(Events.ClientReady, async () => {
                 panelCommand.data.toJSON(),
                 rybyCommand.data.toJSON(),
                 dyzuryCommand.data.toJSON(),
-                wezwijCommand.data.toJSON()
+                wezwijCommand.data.toJSON(),
+                rpStartCommand.data.toJSON()
             ] },
         );
         console.log('Successfully reloaded application (/) commands.');
@@ -248,6 +250,13 @@ client.on('interactionCreate', async interaction => {
             }
         } else if (interaction.commandName === 'rejestracja-adm') {
             await rejestracjaAdminCommands.execute(interaction);
+        } else if (interaction.commandName === 'rp-start') {
+            try {
+                await rpStartCommand.execute(interaction);
+            } catch (err) {
+                console.error('Error executing rpStartCommand:', err);
+                if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: '❌ Błąd podczas startu RP.', ephemeral: true });
+            }
         } else if (interaction.commandName === 'eco-admin') {
             await economyAdminCommands.execute(interaction);
         } else if (interaction.commandName === 'logi') {
