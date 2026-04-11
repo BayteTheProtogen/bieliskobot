@@ -20,6 +20,7 @@ import { rybyCommand } from './commands/ryby';
 import { dyzuryCommand } from './commands/dyzury';
 import { wezwijCommand } from './commands/wezwij';
 import { rpStartCommand } from './commands/rp-start';
+import { rpStopCommand } from './commands/rp-stop';
 import { erlcModeration } from './services/erlc';
 import { initVision } from './services/vision';
 import { generatePrisonerCard, generateArrestCard, generateKartotekaCard } from './services/canvas';
@@ -86,8 +87,9 @@ client.once(Events.ClientReady, async () => {
                 panelCommand.data.toJSON(),
                 rybyCommand.data.toJSON(),
                 dyzuryCommand.data.toJSON(),
-                wezwijCommand.data.toJSON(),
-                rpStartCommand.data.toJSON()
+                wezwij_1.wezwijCommand.data.toJSON(),
+                rpStartCommand.data.toJSON(),
+                rpStopCommand.data.toJSON()
             ] },
         );
         console.log('Successfully reloaded application (/) commands.');
@@ -250,6 +252,13 @@ client.on('interactionCreate', async interaction => {
             }
         } else if (interaction.commandName === 'rejestracja-adm') {
             await rejestracjaAdminCommands.execute(interaction);
+        } else if (interaction.commandName === 'rp-stop') {
+            try {
+                await rpStopCommand.execute(interaction);
+            } catch (err) {
+                console.error('Error executing rpStopCommand:', err);
+                if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: '❌ Błąd podczas zatrzymywania RP.', ephemeral: true });
+            }
         } else if (interaction.commandName === 'rp-start') {
             try {
                 await rpStartCommand.execute(interaction);

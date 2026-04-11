@@ -1545,9 +1545,9 @@ export async function generateRPStartCard(data: RPStartData): Promise<Buffer> {
         ctx.stroke();
     }
 
-    // 2. GRADIENT BOCZNY (Agresywna czerwień)
+    // 2. GRADIENT BOCZNY (Soczysta zieleń)
     const grad = ctx.createLinearGradient(0, 0, 300, 0);
-    grad.addColorStop(0, '#6e1d1d');
+    grad.addColorStop(0, '#1d6e3c');
     grad.addColorStop(1, 'transparent');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 300, height);
@@ -1558,11 +1558,11 @@ export async function generateRPStartCard(data: RPStartData): Promise<Buffer> {
     ctx.textAlign = 'left';
     ctx.fillText('SESJA', 60, 150);
     
-    ctx.fillStyle = '#e74c3c';
+    ctx.fillStyle = '#2ecc71';
     ctx.fillText('ROZPOCZĘTA', 60, 240);
 
     // Pasek dekoracyjny
-    ctx.fillStyle = '#e74c3c';
+    ctx.fillStyle = '#2ecc71';
     ctx.fillRect(60, 270, 400, 8);
 
     // 4. DANE SESJI
@@ -1577,8 +1577,8 @@ export async function generateRPStartCard(data: RPStartData): Promise<Buffer> {
     };
 
     drawInfo('Host Sesji', data.hostName, 340);
-    drawInfo('Miejsce Zbiórki', data.location || 'Brak danych', 440);
-    drawInfo('Data i Godzina', data.date, 540);
+    // drawInfo('Miejsce Zbiórki', data.location || 'Brak danych', 440); // Usunięte na prośbę użytkownika
+    drawInfo('Data i Godzina', data.date, 440);
 
     // 5. EMBLEMAT (Pieczęć Administracji)
     ctx.save();
@@ -1600,6 +1600,72 @@ export async function generateRPStartCard(data: RPStartData): Promise<Buffer> {
     ctx.font = '12px SpaceMono';
     ctx.textAlign = 'right';
     ctx.fillText('BIELISKO ROLEPLAY // SYSTEM AUTOMATYCZNY // 2026', width - 40, height - 30);
+
+    return canvas.toBuffer('image/png');
+}
+
+export async function generateRPStopCard(date: string): Promise<Buffer> {
+    const width = 1000;
+    const height = 450;
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+
+    // 1. TŁO
+    ctx.fillStyle = '#0a0b0d';
+    ctx.fillRect(0, 0, width, height);
+
+    // Dynamiczne linie tła
+    ctx.strokeStyle = 'rgba(231, 76, 60, 0.05)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < width * 1.5; i += 40) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i - height, height);
+        ctx.stroke();
+    }
+
+    // 2. GRADIENT BOCZNY (Czerwień)
+    const grad = ctx.createLinearGradient(0, 0, 300, 0);
+    grad.addColorStop(0, '#6e1d1d');
+    grad.addColorStop(1, 'transparent');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 300, height);
+
+    // 3. NAGŁÓWEK
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 84px RobotoBold';
+    ctx.textAlign = 'left';
+    ctx.fillText('SESJA', 60, 150);
+    
+    ctx.fillStyle = '#e74c3c';
+    ctx.fillText('ZAKOŃCZONA', 60, 240);
+
+    // Pasek dekoracyjny
+    ctx.fillStyle = '#e74c3c';
+    ctx.fillRect(60, 270, 450, 8);
+
+    // 4. DATA
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.font = 'bold 16px Roboto';
+    ctx.fillText('DATA ZAKOŃCZENIA', 60, 340);
+    
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '32px SpaceMono';
+    ctx.fillText(date, 60, 385);
+
+    // 5. EMBLEMAT
+    ctx.save();
+    ctx.translate(width - 200, height / 2);
+    ctx.globalAlpha = 0.15;
+    ctx.strokeStyle = '#e74c3c';
+    ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.arc(0, 0, 140, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#e74c3c';
+    ctx.font = 'bold 36px Roboto';
+    ctx.textAlign = 'center';
+    ctx.fillText('SESSION', 0, 0);
+    ctx.fillText('CLOSED', 0, 40);
+    ctx.restore();
 
     return canvas.toBuffer('image/png');
 }

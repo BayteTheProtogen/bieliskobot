@@ -1,24 +1,17 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits, AttachmentBuilder, TextChannel } from 'discord.js';
-import { generateRPStartCard } from '../services/canvas';
+import { generateRPStopCard } from '../services/canvas';
 
 const HOSTING_CHANNEL_ID = '1490010330888274112';
 
-export const rpStartCommand = {
+export const rpStopCommand = {
     data: new SlashCommandBuilder()
-        .setName('rp-start')
-        .setDescription('Ogłasza rozpoczęcie sesji RolePlay.')
-        .addStringOption(option => 
-            option.setName('informacja')
-                .setDescription('Dodatkowe informacje o sesji')
-                .setRequired(false)
-        )
+        .setName('rp-stop')
+        .setDescription('Ogłasza zakończenie bieżącej sesji RolePlay.')
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply({ ephemeral: true });
 
-        const info = interaction.options.getString('informacja') || 'Zapraszamy do wspólnej gry!';
-        const hostName = interaction.user.username;
         const dateStr = new Date().toLocaleString('pl-PL', { 
             hour: '2-digit', 
             minute: '2-digit',
@@ -30,31 +23,25 @@ export const rpStartCommand = {
 
         try {
             // 1. Generate Graphic
-            const cardBuffer = await generateRPStartCard({
-                hostName,
-                location: '', 
-                info,
-                date: dateStr
-            });
-
-            const attachment = new AttachmentBuilder(cardBuffer, { name: 'rp-start.png' });
+            const cardBuffer = await generateRPStopCard(dateStr);
+            const attachment = new AttachmentBuilder(cardBuffer, { name: 'rp-stop.png' });
 
             // 2. Send to hosting channel
             const channel = await interaction.client.channels.fetch(HOSTING_CHANNEL_ID).catch(() => null) as TextChannel;
             
             if (channel) {
                 await channel.send({
-                    content: `🔔 **NOWA SESJA ROLEPLAY!**\nHost: <@${interaction.user.id}>\n\n**Informacja:** ${info}\n\n@everyone`,
+                    content: `🏁 **SESJA ROLEPLAY ZAKOŃCZONA**\nZakończona przez: <@${interaction.user.id}>\nData: **${dateStr}**\n\n@everyone`,
                     files: [attachment]
                 });
 
-                await interaction.editReply({ content: '✅ Sesja została ogłoszona pomyślnie!' });
+                await interaction.editReply({ content: '✅ Zakończenie sesji zostało ogłoszone!' });
             } else {
                 await interaction.editReply({ content: '❌ Nie znaleziono kanału ogłoszeniowego.' });
             }
 
         } catch (err) {
-            console.error('Error in rpStartCommand:', err);
+            console.error('Error in rpStopCommand:', err);
             await interaction.editReply({ content: '❌ Wystąpił błąd podczas generowania ogłoszenia.' });
         }
     }
