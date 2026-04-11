@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Client, TextChannel, EmbedBuilder as DiscordEmbedBuilder } from 'discord.js';
 import { prisma } from '../services/db';
-import { executeERLCCommand } from '../services/erlc';
+import { executeERLCCommand, getCommandLogs, getKillLogs } from '../services/erlc';
 import { finalizeAction } from '../services/modActions';
 import axios from 'axios';
 
@@ -41,17 +41,41 @@ async function getSession(req: http.IncomingMessage) {
     return session;
 }
 
+// Helper to get server nickname or username
+async function getMemberNick(client: Client, discordId: string): Promise<string> {
+    try {
+        const guild = client.guilds.cache.first(); // Assuming the bot is in one main guild for now, or fetch from channel config
+        if (guild) {
+            const member = await guild.members.fetch(discordId).catch(() => null);
+            if (member) return member.nickname || member.user.username;
+        }
+    } catch {}
+    const user = await client.users.fetch(discordId).catch(() => null);
+    return user?.username || discordId;
+}
+
 // Logging helper
 async function logActionToDiscord(client: Client, discordId: string, title: string, description: string, color: string = '#3498db') {
     try {
         const channel = await client.channels.fetch(LOG_WWW_CHANNEL).catch(() => null) as TextChannel;
         if (!channel) return;
 
+        // Emoji mapping based on title/type
+        let emoji = '🌐';
+        if (title.includes('Rozpoczęcie')) emoji = '➕';
+        else if (title.includes('Koniec')) emoji = '➖';
+        else if (title.includes('BAN')) emoji = '🛑';
+        else if (title.includes('KICK')) emoji = '👟';
+        else if (title.includes('WARN')) emoji = '⚠️';
+        else if (title.includes('LOG')) emoji = '📝';
+
+        const nick = await getMemberNick(client, discordId);
+
         const embed = new DiscordEmbedBuilder()
-            .setTitle(`🌐 [WebPanel] ${title}`)
+            .setTitle(`${emoji} [WebPanel] ${title}`)
             .setDescription(description)
             .setColor(color as any)
-            .addFields({ name: 'Moderator', value: `<@${discordId}>`, inline: true })
+            .addFields({ name: 'Moderator', value: `**${nick}** (<@${discordId}>)`, inline: true })
             .setTimestamp();
 
         await channel.send({ embeds: [embed] });
@@ -66,8 +90,11 @@ async function sendShiftReport(client: Client, moderatorId: string, durationMin:
         const channel = await client.channels.fetch(SHIFTS_CHANNEL).catch(() => null) as TextChannel;
         if (!channel) return;
 
+        const nick = await getMemberNick(client, moderatorId);
+
         const embed = new DiscordEmbedBuilder()
-            .setTitle(`📋 Raport z dyżuru: <@${moderatorId}>`)
+            .setTitle(`📋 Raport z dyżuru: ${nick}`)
+            .setDescription(`<@${moderatorId}> zakończył swój dyżur.`)
             .setColor(isAuto ? '#e67e22' : '#2ecc71')
             .addFields(
                 { name: '⏱️ Czas trwania', value: `**${durationMin} min**`, inline: true },
@@ -270,6 +297,29 @@ export function startWebServer(client: Client, port: number = 3000) {
                 } catch (e: any) {
                     res.writeHead(500); return res.end(JSON.stringify({ error: 'Blad ERLC' }));
                 }
+            }
+
+            if (req.method === 'GET' && pathname === '/api/logs/moderation') {
+                const filter = url.searchParams.get('filter') || 'all';
+                const whereClause = filter === 'me' ? { moderatorDiscordId: session!.discordId } : {};
+                
+                const logs = await prisma.banLog.findMany({
+                    where: whereClause,
+                    orderBy: { createdAt: 'desc' },
+                    take: 20
+                });
+
+                res.writeHead(200); return res.end(JSON.stringify(logs));
+            }
+
+            if (req.method === 'GET' && pathname === '/api/logs/server/commands') {
+                const logs = await getCommandLogs();
+                res.writeHead(200); return res.end(JSON.stringify(logs.slice(0, 20)));
+            }
+
+            if (req.method === 'GET' && pathname === '/api/logs/server/kills') {
+                const logs = await getKillLogs();
+                res.writeHead(200); return res.end(JSON.stringify(logs.slice(0, 20)));
             }
 
             if (req.method === 'POST' && pathname === '/api/action') {

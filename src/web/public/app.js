@@ -1,6 +1,7 @@
 let sessionToken = '';
 let isShiftActive = false;
 let playersData = [];
+let currentModTab = 'me';
 
 // DOM Elements
 const elApp = document.getElementById('app');
@@ -38,9 +39,13 @@ window.addEventListener('DOMContentLoaded', async () => {
         
         loadPlayers();
         loadActiveModerators();
+        loadModerationLogs();
+        loadServerLogs();
 
         setInterval(loadPlayers, 120000); // 2 min auto-refresh
         setInterval(loadActiveModerators, 60000); // 1 min refresh mods
+        setInterval(loadModerationLogs, 30000); // 30 sec mod logs
+        setInterval(loadServerLogs, 15000); // 15 sec server logs
         
         // Heartbeat system (every 30s)
         setInterval(() => sendHeartbeat(), 30000);
@@ -139,6 +144,93 @@ async function authenticate() {
         document.getElementById('userAvatar').src = user.avatar;
     }
     setShiftState(user.shiftActive);
+}
+
+// Moderation Logs
+async function loadModerationLogs() {
+    try {
+        const logs = await apiCall(`/api/logs/moderation?filter=${currentModTab}`);
+        renderModLogs(logs);
+    } catch (e) {
+        console.error('Failed to load mod logs');
+    }
+}
+
+function renderModLogs(logs) {
+    const list = document.getElementById('modLogsList');
+    if (!list) return;
+
+    if (logs.length === 0) {
+        list.innerHTML = '<p class="empty-state">Brak ostatnich akcji.</p>';
+        return;
+    }
+
+    list.innerHTML = logs.map(log => {
+        let typeEmoji = '📋';
+        if (log.isPermBan) typeEmoji = '💀';
+        else if (log.bannedUntil) typeEmoji = '⛓️';
+        else if (log.unbannedAt) typeEmoji = '🔓';
+
+        return `
+            <div class="log-item">
+                <div class="log-item-header">
+                    <span class="log-type">${typeEmoji} ${log.bannedUntil ? 'TempBan' : (log.isPermBan ? 'PermBan' : 'Akcja')}</span>
+                    <span class="log-time">${new Date(log.createdAt).toLocaleTimeString()}</span>
+                </div>
+                <div class="log-body">
+                    Gracz: <strong>${log.playerNick}</strong><br>
+                    Powód: <small>${log.reason}</small>
+                </div>
+                ${currentModTab === 'all' ? `<span class="log-mod">Mod ID: ${log.moderatorDiscordId.substring(0, 8)}...</span>` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+window.switchModTab = (tab) => {
+    currentModTab = tab;
+    document.getElementById('tabModMe').classList.toggle('active', tab === 'me');
+    document.getElementById('tabModAll').classList.toggle('active', tab === 'all');
+    loadModerationLogs();
+};
+
+// Server Logs (Kill & Commands)
+async function loadServerLogs() {
+    try {
+        const [kills, commands] = await Promise.all([
+            apiCall('/api/logs/server/kills'),
+            apiCall('/api/logs/server/commands')
+        ]);
+        renderKillLogs(kills);
+        renderCommandLogs(commands);
+    } catch (e) {
+        console.error('Failed to load server logs');
+    }
+}
+
+function renderKillLogs(kills) {
+    const list = document.getElementById('killLogsList');
+    if (!list) return;
+    list.innerHTML = kills.map(k => `
+        <div class="server-log-item">
+            <span class="log-time">[${new Date(k.Timestamp * 1000).toLocaleTimeString()}]</span> 
+            <strong>${k.Killer}</strong> ⚔️ ${k.Killed}
+        </div>
+    `).join('') || '<p class="empty-state">Brak danych.</p>';
+}
+
+function renderCommandLogs(commands) {
+    const list = document.getElementById('commandLogsList');
+    if (!list) return;
+    list.innerHTML = commands.map(c => {
+        const [nick] = c.Player.split(':');
+        return `
+            <div class="server-log-item">
+                <span class="log-time">[${new Date(c.Timestamp * 1000).toLocaleTimeString()}]</span> 
+                <strong>${nick}</strong>: <code>${c.Command}</code>
+            </div>
+        `;
+    }).join('') || '<p class="empty-state">Brak danych.</p>';
 }
 
 function setShiftState(active) {

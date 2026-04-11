@@ -42,41 +42,42 @@
         </header>
 
         <main class="dashboard-grid">
-            <!-- Sidebar with Quick Actions -->
-            <aside class="sidebar">
-                <div class="glass-panel sticky-card">
-                    <h3>Szybkie akcje</h3>
-                    <p class="subtitle">Wymagana aktywna służba.</p>
-                    
-                    <button class="btn btn-full btn-log" onclick="openLogModal()">
-                        <span class="icon">📝</span> Utwórz Log Raport
-                    </button>
-                    
-                    <div class="divider"></div>
-                    
-                    <div class="stats-box">
-                        <div class="stat">
-                            <span class="stat-value" id="statsPlayers">0</span>
-                            <span class="stat-label">Online W grze</span>
-                        </div>
+            <!-- Left Sidebar: Moderation Logs with Tabs -->
+            <aside class="left-sidebar">
+                <div class="glass-panel sticky-card log-card">
+                    <div class="card-tabs">
+                        <button class="tab-btn active" id="tabModMe" onclick="switchModTab('me')">Moje Akcje</button>
+                        <button class="tab-btn" id="tabModAll" onclick="switchModTab('all')">Wszystkie</button>
+                    </div>
+                    <div id="modLogsList" class="log-list">
+                        <p class="empty-state">Ładowanie logów...</p>
                     </div>
                 </div>
             </aside>
 
-            <!-- Main Content Area: Players List -->
+            <!-- Center Content Area: Players List & Quick Actions -->
             <section class="main-content">
-                <div class="glass-panel">
+                <div class="glass-panel quick-actions-row">
+                    <h3>Szybkie akcje</h3>
+                    <div class="action-buttons">
+                        <button class="btn btn-log" onclick="openLogModal()">📝 Log Raport</button>
+                        <div class="mini-stat">
+                            <span class="stat-label">Online:</span>
+                            <span class="stat-value" id="statsPlayers">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-panel players-panel">
                     <div class="panel-header">
-                        <h2>Gracze na serwerze (ER:LC)</h2>
+                        <h2>Gracze online (ER:LC)</h2>
                         <div class="panel-controls">
-                            <span id="lastRefreshTime" class="refresh-indicator">Zaktualizowano: teraz</span>
-                            <button id="btnRefresh" class="btn-icon" title="Odśwież manualnie">🔄</button>
+                            <button id="btnRefresh" class="btn-icon" title="Odśwież">🔄</button>
                         </div>
                     </div>
 
                     <div class="search-bar">
-                        <span class="search-icon">🔍</span>
-                        <input type="text" id="searchInput" placeholder="Szukaj gracza (Roblox Nick)...">
+                        <input type="text" id="searchInput" placeholder="Szukaj gracza...">
                     </div>
 
                     <div class="table-container">
@@ -85,27 +86,32 @@
                                 <tr>
                                     <th>Gracz (Roblox)</th>
                                     <th>Permisje</th>
-                                    <th class="actions-col">Narzędzia Mod.</th>
+                                    <th class="actions-col">Opcje</th>
                                 </tr>
                             </thead>
-                            <tbody id="playersList">
-                                <!-- Data injected via JS -->
-                            </tbody>
+                            <tbody id="playersList"></tbody>
                         </table>
-                        <div id="noPlayers" class="empty-state" style="display:none;">
-                            <span class="empty-icon">👻</span>
-                            <p>Brak graczy spełniających kryteria wyszukiwania.</p>
-                        </div>
                     </div>
                 </div>
             </section>
 
-            <!-- Right Sidebar: Active Mods -->
+            <!-- Right Sidebar: Server Logs & Duty Status -->
             <aside class="right-sidebar">
-                <div class="glass-panel sticky-card">
-                    <h3>🟢 Na służbie</h3>
-                    <div id="activeModeratorsList" class="mods-list">
-                        <p class="empty-mods">Nikt nie jest obecnie na służbie.</p>
+                <div class="glass-panel sticky-card log-card">
+                    <h3>🛡️ Na służbie</h3>
+                    <div id="activeModeratorsList" class="mods-list"></div>
+                    
+                    <div class="divider"></div>
+                    
+                    <div class="server-logs">
+                        <div class="log-section">
+                            <h4>⚔️ Kill Log</h4>
+                            <div id="killLogsList" class="log-list small"></div>
+                        </div>
+                        <div class="log-section">
+                            <h4>⌨️ Command Log</h4>
+                            <div id="commandLogsList" class="log-list small"></div>
+                        </div>
                     </div>
                 </div>
             </aside>
