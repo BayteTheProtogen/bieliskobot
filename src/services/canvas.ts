@@ -1041,7 +1041,51 @@ export async function generateVehicleCard(data: VehicleCardData): Promise<Buffer
 
 export async function generateWantedPoster(nick: string, reason: string, avatarUrl: string): Promise<Buffer> {
     const width = 600;
-    const height = 850;
+    const baseContentHeight = 760; // Miejsce do końca napisu "ZARZUTY"
+    const lineHeight = 24;
+    const maxWidth = width - 120;
+
+    // 1. Oblicz ile linii zajmie tekst (adaptacyjna wysokość)
+    const dummyCanvas = createCanvas(1, 1);
+    const dummyCtx = dummyCanvas.getContext('2d');
+    dummyCtx.font = '18px Roboto';
+
+    const calculateLines = (text: string): number => {
+        const words = text.split(' ');
+        let lines = 0;
+        let line = '';
+        for (const word of words) {
+            let testLine = line + word + ' ';
+            if (dummyCtx.measureText(testLine).width > maxWidth && line !== '') {
+                lines++;
+                line = word + ' ';
+            } else if (dummyCtx.measureText(testLine).width > maxWidth && line === '') {
+                let subWord = word;
+                while (subWord.length > 0) {
+                    let len = 0;
+                    let part = '';
+                    while (len < subWord.length && dummyCtx.measureText(part + subWord[len]).width < maxWidth) {
+                        part += subWord[len];
+                        len++;
+                    }
+                    if (len === 0) len = 1;
+                    lines++;
+                    subWord = subWord.substring(len);
+                }
+                line = '';
+            } else {
+                line = testLine;
+            }
+        }
+        if (line) lines++;
+        return lines;
+    };
+
+    const numLines = calculateLines(reason);
+    const dynamicHeight = numLines * lineHeight;
+    const footerSpace = 120;
+    const height = Math.max(850, baseContentHeight + dynamicHeight + footerSpace);
+
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
 
@@ -1142,47 +1186,73 @@ export async function generateWantedPoster(nick: string, reason: string, avatarU
     
     ctx.fillStyle = '#dfe6e9';
     ctx.font = '18px Roboto';
-    const words = reason.split(' ');
-    let line = '';
-    let currentY = dataY + 115;
-    
-    for (const word of words) {
-        const test = line + word + ' ';
-        if (ctx.measureText(test).width > width - 120) {
-            ctx.fillText(line, 60, currentY);
-            line = word + ' ';
-            currentY += 24;
-        } else {
-            line = test;
+    const wrapText = (text: string, x: number, y: number, maxWidth: number, lineHeight: number) => {
+        const words = text.split(' ');
+        let line = '';
+        let testY = y;
+
+        for (const word of words) {
+            let testLine = line + word + ' ';
+            let metrics = ctx.measureText(testLine);
+            
+            if (metrics.width > maxWidth && line !== '') {
+                ctx.fillText(line, x, testY);
+                line = word + ' ';
+                testY += lineHeight;
+            } else if (metrics.width > maxWidth && line === '') {
+                // Słowo jest dłuższe niż cała linia - wymuś podział (break word)
+                let subWord = word;
+                while (subWord.length > 0) {
+                    let part = '';
+                    let i = 0;
+                    while (i < subWord.length && ctx.measureText(part + subWord[i]).width < maxWidth) {
+                        part += subWord[i];
+                        i++;
+                    }
+                    if (part === '') part = subWord[0], i = 1; // Failsafe
+                    ctx.fillText(part, x, testY);
+                    subWord = subWord.substring(i);
+                    testY += lineHeight;
+                }
+                line = '';
+            } else {
+                line = testLine;
+            }
         }
-    }
-    ctx.fillText(line, 60, currentY);
+        if (line) ctx.fillText(line, x, testY);
+    };
+    wrapText(reason, 60, dataY + 115, width - 120, 24);
 
-    // 5. CYFROWE DETALE (Dół)
-    const footerY = height - 50;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-    ctx.font = '12px SpaceMono';
+    // 5. CYFROWE DETALE (Dół) - Przesunięte, by uniknąć nakładania
+    const footerY = height - 40;
+    
+    // Proceduralny kod kreskowy (mały) - na środek pod tekstem
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    const barWidth = 200;
+    const barStartX = (width - barWidth) / 2;
+    for (let i = 0; i < barWidth; i += Math.random() * 5 + 2) {
+        ctx.fillRect(barStartX + i, footerY - 50, Math.random() * 2 + 1, 25);
+    }
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.font = '11px SpaceMono';
     ctx.textAlign = 'center';
-    ctx.fillText(`ID-TRK:${Math.random().toString(36).substring(7).toUpperCase()} // STATUS: ACTIVE // AUTH:${Date.now()}`, width / 2, footerY);
+    ctx.fillText(`ID-TRK:${Math.random().toString(36).substring(7).toUpperCase()} // STATUS: ACTIVE // AUTH:${Date.now()}`, width / 2, footerY - 10);
+    ctx.fillText(`BIELISKO CRIMINAL REGISTRY // PROPERTY OF RP GOVERNMENT`, width / 2, footerY + 5);
 
-    // Proceduralny kod kreskowy (mały)
-    ctx.fillStyle = '#ffffff';
-    for (let i = 0; i < 150; i += Math.random() * 5 + 2) {
-        ctx.fillRect(400 + i, footerY - 15, Math.random() * 2 + 1, 20);
-    }
-
-    // 6. PIECZĘĆ MODERNY (Subtelny orzeł)
+    // 6. PIECZĘĆ MODERNY (Subtelny orzeł) - NA SAMYM KONCU (Top Layer)
     ctx.save();
-    ctx.translate(width - 100, 100);
-    ctx.globalAlpha = 0.3;
+    ctx.translate(width - 110, 110);
+    ctx.globalAlpha = 0.5; // Zwiększona widoczność
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(0, 0, 40, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(0, 0, 45, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, 38, 0, Math.PI * 2); ctx.stroke();
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 12px Roboto';
-    ctx.fillText('POLICE', 0, 5);
+    ctx.fillText('POLICE', 0, 4);
+    ctx.font = 'bold 8px Roboto';
+    ctx.fillText('DIVISION', 0, 15);
     ctx.restore();
 
     return canvas.toBuffer('image/png');

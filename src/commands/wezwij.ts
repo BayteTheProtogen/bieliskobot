@@ -98,8 +98,9 @@ export const wezwijCommand = {
                 await (logChannel as any).send({ embeds: [logEmbed] });
             }
 
+            const mention = citizen ? `<@${citizen.discordId}>` : `**${targetNick}**`;
             await interaction.editReply({ 
-                content: `🔔 **OFICJALNE WEZWANIE OBYWATELA**\nERLC: ${erlcResult.success ? '✅' : '❌ ' + erlcResult.error}\nDiscord: ${dmStatus}`,
+                content: `🔔 **OFICJALNE WEZWANIE OBYWATELA ${mention}**\nERLC: ${erlcResult.success ? '✅' : '❌ ' + erlcResult.error}\nDiscord: ${dmStatus}`,
                 files: [attachment]
             });
 
