@@ -82,7 +82,7 @@ export const wezwijCommand = {
                     )
                     .setColor('#f1c40f')
                     .setTimestamp();
-                await logChannel.send({ embeds: [logEmbed] });
+                await (logChannel as any).send({ embeds: [logEmbed] });
             }
 
             await interaction.editReply({ 
