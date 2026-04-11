@@ -72,6 +72,7 @@
                     <div class="panel-header">
                         <h2>Gracze online (ER:LC)</h2>
                         <div class="panel-controls">
+                            <span id="lastRefreshTime" class="refresh-indicator">Zaktualizowano: teraz</span>
                             <button id="btnRefresh" class="btn-icon" title="Odśwież">🔄</button>
                         </div>
                     </div>
@@ -91,6 +92,10 @@
                             </thead>
                             <tbody id="playersList"></tbody>
                         </table>
+                        <div id="noPlayers" class="empty-state" style="display:none;">
+                            <span class="empty-icon">👻</span>
+                            <p>Brak graczy spełniających kryteria wyszukiwania.</p>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -103,15 +108,13 @@
                     
                     <div class="divider"></div>
                     
-                    <div class="server-logs">
-                        <div class="log-section">
-                            <h4>⚔️ Kill Log</h4>
-                            <div id="killLogsList" class="log-list small"></div>
-                        </div>
-                        <div class="log-section">
-                            <h4>⌨️ Command Log</h4>
-                            <div id="commandLogsList" class="log-list small"></div>
-                        </div>
+                    <div class="card-tabs">
+                        <button class="tab-btn active" id="tabSerKills" onclick="switchServerTab('kills')">Kille</button>
+                        <button class="tab-btn" id="tabSerComs" onclick="switchServerTab('commands')">Komendy</button>
+                    </div>
+                    
+                    <div id="serverLogsList" class="log-list small">
+                        <p class="empty-state">Ładowanie logów...</p>
                     </div>
                 </div>
             </aside>

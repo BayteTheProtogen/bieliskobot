@@ -309,7 +309,12 @@ export function startWebServer(client: Client, port: number = 3000) {
                     take: 20
                 });
 
-                res.writeHead(200); return res.end(JSON.stringify(logs));
+                const enhancedLogs = await Promise.all(logs.map(async (l: any) => ({
+                    ...l,
+                    moderatorNick: l.moderatorDiscordId ? await getMemberNick(client, l.moderatorDiscordId) : 'System'
+                })));
+
+                res.writeHead(200); return res.end(JSON.stringify(enhancedLogs));
             }
 
             if (req.method === 'GET' && pathname === '/api/logs/server/commands') {

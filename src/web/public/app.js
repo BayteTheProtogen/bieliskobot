@@ -2,6 +2,7 @@ let sessionToken = '';
 let isShiftActive = false;
 let playersData = [];
 let currentModTab = 'me';
+let currentServerTab = 'kills';
 
 // DOM Elements
 const elApp = document.getElementById('app');
@@ -181,7 +182,7 @@ function renderModLogs(logs) {
                     Gracz: <strong>${log.playerNick}</strong><br>
                     Powód: <small>${log.reason}</small>
                 </div>
-                ${currentModTab === 'all' ? `<span class="log-mod">Mod ID: ${log.moderatorDiscordId.substring(0, 8)}...</span>` : ''}
+                ${currentModTab === 'all' ? `<span class="log-mod">Mod: ${log.moderatorNick || 'System'}</span>` : ''}
             </div>
         `;
     }).join('');
@@ -209,9 +210,12 @@ async function loadServerLogs() {
 }
 
 function renderKillLogs(kills) {
-    const list = document.getElementById('killLogsList');
+    if (currentServerTab !== 'kills') return;
+    const list = document.getElementById('serverLogsList');
     if (!list) return;
-    list.innerHTML = kills.map(k => `
+
+    const data = [...kills].reverse();
+    list.innerHTML = data.map(k => `
         <div class="server-log-item">
             <span class="log-time">[${new Date(k.Timestamp * 1000).toLocaleTimeString()}]</span> 
             <strong>${k.Killer}</strong> ⚔️ ${k.Killed}
@@ -220,9 +224,12 @@ function renderKillLogs(kills) {
 }
 
 function renderCommandLogs(commands) {
-    const list = document.getElementById('commandLogsList');
+    if (currentServerTab !== 'commands') return;
+    const list = document.getElementById('serverLogsList');
     if (!list) return;
-    list.innerHTML = commands.map(c => {
+
+    const data = [...commands].reverse();
+    list.innerHTML = data.map(c => {
         const [nick] = c.Player.split(':');
         return `
             <div class="server-log-item">
@@ -232,6 +239,14 @@ function renderCommandLogs(commands) {
         `;
     }).join('') || '<p class="empty-state">Brak danych.</p>';
 }
+
+window.switchServerTab = (tab) => {
+    currentServerTab = tab;
+    document.getElementById('tabSerKills').classList.toggle('active', tab === 'kills');
+    document.getElementById('tabSerComs').classList.toggle('active', tab === 'commands');
+    document.getElementById('serverLogsList').innerHTML = '<p class="empty-state">Ładowanie...</p>';
+    loadServerLogs();
+};
 
 function setShiftState(active) {
     isShiftActive = active;
