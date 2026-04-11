@@ -961,11 +961,17 @@ export async function generateVehicleCard(data: VehicleCardData): Promise<Buffer
     ctx.clip();
     
     try {
-        const carImg = await loadImage(data.carImageUrl);
+        const response = await axios.get(data.carImageUrl, { responseType: 'arraybuffer' });
+        const carImg = await loadImage(Buffer.from(response.data));
         ctx.drawImage(carImg, imgX, imgY, imgW, imgH);
     } catch (e) {
         ctx.fillStyle = '#d1d5db';
         ctx.fillRect(imgX, imgY, imgW, imgH);
+        ctx.fillStyle = '#9ca3af';
+        ctx.font = '14px Roboto';
+        ctx.textAlign = 'center';
+        ctx.fillText('BŁĄD ŁADOWANIA ZDJĘCIA', imgX + imgW / 2, imgY + imgH / 2);
+        ctx.textAlign = 'left';
     }
     ctx.restore();
 
@@ -1039,41 +1045,33 @@ export async function generateWantedPoster(nick: string, reason: string, avatarU
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
 
-    // 1. TŁO - Nowoczesna Głęboka Czerń/Antracyt
-    const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
-    bgGrad.addColorStop(0, '#0f0f0f');
-    bgGrad.addColorStop(0.5, '#1a1a1a');
-    bgGrad.addColorStop(1, '#050505');
-    ctx.fillStyle = bgGrad;
+    // 1. TŁO - Matowy Antracyt (Zdecydowanie mniej flashy)
+    ctx.fillStyle = '#0f1012';
     ctx.fillRect(0, 0, width, height);
 
-    // Subtelna tekstura "szczotkowanego metalu"
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < height; i += 2) {
-        ctx.beginPath();
-        ctx.moveTo(0, i);
-        ctx.lineTo(width, i + (Math.random() * 2 - 1));
-        ctx.stroke();
+    // Dyskretna tekstura papieru/muru
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.015)';
+    for (let i = 0; i < 500; i++) {
+        ctx.fillRect(Math.random() * width, Math.random() * height, 1, 1);
     }
 
-    // Czerwony akcent boczny (Agresywny)
-    ctx.fillStyle = '#c0392b';
+    // Prosta, urzędowa ramka boczna
+    ctx.fillStyle = '#6e1d1d';
     ctx.fillRect(0, 0, 10, height);
-    ctx.fillRect(width - 10, 0, 10, height);
 
-    // 2. NAGŁÓWEK - POSZUKIWANY
+    // 2. NAGŁÓWEK - POSZUKIWANY (Betonowy, solidny styl)
+    ctx.fillStyle = '#6e1d1d';
+    ctx.fillRect(30, 60, width - 60, 110);
+    
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 85px RobotoBold';
-    ctx.shadowColor = '#e74c3c';
-    ctx.shadowBlur = 15;
-    ctx.fillText('POSZUKIWANY', width / 2, 130);
+    ctx.font = 'bold 72px RobotoBold';
+    // BRAK SHADOWBLUR - czysty, urzędowy tekst
+    ctx.fillText('POSZUKIWANY', width / 2, 140);
     
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = 'rgba(231, 76, 60, 0.6)';
-    ctx.font = 'bold 20px Roboto';
-    ctx.fillText('OFFICIAL WANTED POSTER - BIELISKO POLICE DEPARTMENT', width / 2, 165);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.font = 'bold 13px Roboto';
+    ctx.fillText('BIELISKO POLICE DEPARTMENT // CRIMINAL DIVISION // OFFICIAL POSTER', width / 2, 190);
 
     // 3. OBRAZ POSZUKIWANEGO (Awatara)
     const imgX = 100;
@@ -1325,38 +1323,37 @@ export async function generateSummonsCard(data: SummonsData): Promise<Buffer> {
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
 
-    // 1. TŁO - Nowoczesny, techniczny styl (Ciemny granat + pomarańcz)
-    const bgGrad = ctx.createLinearGradient(0, 0, width, height);
-    bgGrad.addColorStop(0, '#1a1c23');
-    bgGrad.addColorStop(1, '#111317');
-    ctx.fillStyle = bgGrad;
+    // 1. TŁO - Matowy "Government Navy" (Mniej flashy)
+    ctx.fillStyle = '#1a1d24';
     ctx.fillRect(0, 0, width, height);
 
-    // 2. PROCEDURALNE ELEMENTY TŁA
-    ctx.strokeStyle = 'rgba(243, 156, 18, 0.05)';
+    // Subtelny gilof-wzór dla bezpieczeństwa dokumentu
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.015)';
     ctx.lineWidth = 1;
-    for (let i = 0; i < width; i += 40) {
-        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, height); ctx.stroke();
-    }
-    for (let i = 0; i < height; i += 40) {
-        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(width, i); ctx.stroke();
+    for (let i = 0; i < width; i += 60) {
+        ctx.beginPath();
+        for (let j = 0; j < height; j += 10) {
+            ctx.lineTo(i + Math.sin(j * 0.05) * 5, j);
+        }
+        ctx.stroke();
     }
 
-    // Dodanie akcentu bocznego (ostrzegawczego)
-    ctx.fillStyle = '#f39c12';
-    ctx.fillRect(0, 0, 15, height);
+    // Ciemno-złoty akcent boczny (bardzo dyskretny)
+    ctx.fillStyle = '#9e6d1c';
+    ctx.fillRect(0, 0, 10, height);
 
-    // 3. NAGŁÓWEK
-    ctx.fillStyle = '#f39c12';
-    ctx.font = 'bold 32px Roboto';
-    ctx.fillText('OFICJALNE WEZWANIE', 45, 60);
+    // 3. NAGŁÓWEK (Urzędowy)
+    ctx.fillStyle = '#9e6d1c';
+    ctx.font = 'bold 28px RobotoBold';
+    ctx.fillText('OFICJALNE WEZWANIE', 45, 65);
     
-    ctx.fillStyle = '#e67e22';
-    ctx.font = 'bold 14px Roboto';
-    ctx.fillText('URZĄD ADMINISTRACJI BIELISKO - SEKCJA DYSCYPLINARNA', 45, 85);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.font = 'bold 11px Roboto';
+    ctx.fillText('KOMENDA GŁÓWNA POLICJI BIELISKO RP // SEKCJA DYSCYPLINARNA', 45, 88);
 
-    // Pasek dekoracyjny pod nagłówkiem
-    ctx.fillRect(45, 105, width - 90, 4);
+    // Pasek dekoracyjny (cienki)
+    ctx.fillStyle = 'rgba(158, 109, 28, 0.2)';
+    ctx.fillRect(45, 105, width - 90, 1);
 
     // 4. AVATAR (Jeśli podany)
     const contentX = 260;
