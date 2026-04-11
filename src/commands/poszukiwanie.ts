@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, AttachmentBuilder, TextChannel } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, AttachmentBuilder, TextChannel, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { prisma } from '../services/db';
 import { getUserIdByUsername, getAvatarBust } from '../services/roblox';
 import { generateWantedPoster } from '../services/canvas';
@@ -70,9 +70,17 @@ export const poszukiwanieCommand = {
                     return interaction.editReply({ content: '❌ Nie odnaleziono kanału `#poszukiwani`.' });
                 }
 
+                const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`wanted_finish_${nick}`)
+                        .setLabel('ZAKOŃCZ POSZUKIWANIA')
+                        .setStyle(ButtonStyle.Danger)
+                );
+
                 const posterMsg = await channel.send({
                     content: `🚨 **NOWY LIST GOŃCZY**\nZ polecenia funkcjonariusza <@${interaction.user.id}>`,
-                    files: [attachment]
+                    files: [attachment],
+                    components: [row]
                 });
 
                 // 5. Save to DB

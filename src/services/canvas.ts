@@ -1039,58 +1039,59 @@ export async function generateWantedPoster(nick: string, reason: string, avatarU
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
 
-    // 1. TŁO - Stary, pożółkły papier
-    const bgGrad = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, width);
-    bgGrad.addColorStop(0, '#f3e5ab'); // Jasny pergamin
-    bgGrad.addColorStop(1, '#c2b280'); // Ciemniejszy brzeg
+    // 1. TŁO - Nowoczesna Głęboka Czerń/Antracyt
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
+    bgGrad.addColorStop(0, '#0f0f0f');
+    bgGrad.addColorStop(0.5, '#1a1a1a');
+    bgGrad.addColorStop(1, '#050505');
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, width, height);
 
-    // Tekstura papieru (szum i plamy)
-    ctx.fillStyle = 'rgba(0,0,0,0.03)';
-    for (let i = 0; i < 2000; i++) {
+    // Subtelna tekstura "szczotkowanego metalu"
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < height; i += 2) {
         ctx.beginPath();
-        const x = Math.random() * width;
-        const y = Math.random() * height;
-        const r = Math.random() * 2 + 1;
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.moveTo(0, i);
+        ctx.lineTo(width, i + (Math.random() * 2 - 1));
+        ctx.stroke();
     }
-    
-    // Ramka
-    ctx.strokeStyle = '#451a03';
-    ctx.lineWidth = 15;
-    ctx.strokeRect(20, 20, width - 40, height - 40);
-    ctx.lineWidth = 2;
-    ctx.strokeRect(35, 35, width - 70, height - 70);
 
-    // 2. NAGŁÓWEK - WANTED
-    ctx.fillStyle = '#451a03';
-    ctx.font = 'bold 110px RobotoBold';
+    // Czerwony akcent boczny (Agresywny)
+    ctx.fillStyle = '#c0392b';
+    ctx.fillRect(0, 0, 10, height);
+    ctx.fillRect(width - 10, 0, 10, height);
+
+    // 2. NAGŁÓWEK - POSZUKIWANY
     ctx.textAlign = 'center';
-    ctx.shadowColor = 'rgba(0,0,0,0.3)';
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 5;
-    ctx.fillText('WANTED', width / 2, 160);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 85px RobotoBold';
+    ctx.shadowColor = '#e74c3c';
+    ctx.shadowBlur = 15;
+    ctx.fillText('POSZUKIWANY', width / 2, 130);
+    
     ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
+    ctx.fillStyle = 'rgba(231, 76, 60, 0.6)';
+    ctx.font = 'bold 20px Roboto';
+    ctx.fillText('OFFICIAL WANTED POSTER - BIELISKO POLICE DEPARTMENT', width / 2, 165);
 
     // 3. OBRAZ POSZUKIWANEGO (Awatara)
     const imgX = 100;
-    const imgY = 200;
+    const imgY = 220;
     const imgW = 400;
     const imgH = 400;
 
-    // Tło pod zdjęcie
-    ctx.fillStyle = 'rgba(0,0,0,0.1)';
-    ctx.fillRect(imgX - 10, imgY - 10, imgW + 20, imgH + 20);
-    
+    // Ramka zdjęcia z neonowym efektem
+    ctx.strokeStyle = '#e74c3c';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(imgX - 4, imgY - 4, imgW + 8, imgH + 8);
+
     if (avatarUrl) {
         try {
             const response = await axios.get(avatarUrl, { responseType: 'arraybuffer' });
             const avatar = await loadImage(Buffer.from(response.data));
             
-            // Czarno-biały filtr dla klimatu retro
+            // Filtr: Wysoki kontrast / Lekka czerwień w cieniach
             const tempCanvas = createCanvas(imgW, imgH);
             const tCtx = tempCanvas.getContext('2d');
             tCtx.drawImage(avatar, 0, 0, imgW, imgH);
@@ -1098,58 +1099,92 @@ export async function generateWantedPoster(nick: string, reason: string, avatarU
             const imgData = tCtx.getImageData(0, 0, imgW, imgH);
             for (let i = 0; i < imgData.data.length; i += 4) {
                 const avg = (imgData.data[i] + imgData.data[i + 1] + imgData.data[i + 2]) / 3;
-                imgData.data[i] = avg;
-                imgData.data[i + 1] = avg * 0.9; // Lekka sepia
-                imgData.data[i + 2] = avg * 0.8;
+                // High contrast
+                const contrast = 1.3;
+                const factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+                imgData.data[i] = factor * (avg - 128) + 128;
+                imgData.data[i+1] = (factor * (avg - 128) + 128) * 0.8;
+                imgData.data[i+2] = (factor * (avg - 128) + 128) * 0.8;
             }
             tCtx.putImageData(imgData, 0, 0);
-            
             ctx.drawImage(tempCanvas, imgX, imgY, imgW, imgH);
+            
+            // Linie skanowania na zdjęciu
+            ctx.fillStyle = 'rgba(0,0,0,0.15)';
+            for(let i=imgY; i<imgY+imgH; i+=4) {
+                ctx.fillRect(imgX, i, imgW, 1);
+            }
+
         } catch (e) {
-            ctx.fillStyle = '#94a3b8';
+            ctx.fillStyle = '#2c3e50';
             ctx.fillRect(imgX, imgY, imgW, imgH);
             ctx.fillStyle = '#ffffff';
             ctx.font = '40px Roboto';
-            ctx.fillText('BRAK FOTO', width / 2, imgY + imgH / 2);
+            ctx.fillText('BŁĄD IDENTYFIKACJI', width / 2, imgY + imgH / 2);
         }
     }
 
-    // 4. DANE - NICK I POWÓD
-    ctx.fillStyle = '#451a03';
-    ctx.font = 'bold 48px RobotoBold';
-    ctx.fillText(nick.toUpperCase(), width / 2, 670);
+    // 4. DANE - NICK I POWÓD (Nowoczesny układ)
+    const dataY = 670;
     
-    ctx.font = 'italic 24px Roboto';
+    // Etykieta Nick
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#e74c3c';
+    ctx.font = 'bold 14px Roboto';
+    ctx.fillText('IDENTYFIKACJA OBYWATELA:', 60, dataY);
+    
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 46px SpaceMono';
+    ctx.fillText(nick.toUpperCase(), 60, dataY + 45);
+
+    // Powód wezwania
+    ctx.fillStyle = '#e74c3c';
+    ctx.font = 'bold 14px Roboto';
+    ctx.fillText('ZARZUTY / POWÓD POSZUKIWAŃ:', 60, dataY + 90);
+    
+    ctx.fillStyle = '#dfe6e9';
+    ctx.font = '18px Roboto';
     const words = reason.split(' ');
     let line = '';
-    let currentY = 730;
-    ctx.fillText('POWÓD POSZUKIWAŃ:', width / 2, 715);
+    let currentY = dataY + 115;
     
-    ctx.font = 'bold 28px Roboto';
     for (const word of words) {
         const test = line + word + ' ';
         if (ctx.measureText(test).width > width - 120) {
-            ctx.fillText(line, width / 2, currentY);
+            ctx.fillText(line, 60, currentY);
             line = word + ' ';
-            currentY += 35;
+            currentY += 24;
         } else {
             line = test;
         }
     }
-    ctx.fillText(line, width / 2, currentY);
+    ctx.fillText(line, 60, currentY);
 
-    // 5. STEMPEL "Bielisko Police"
+    // 5. CYFROWE DETALE (Dół)
+    const footerY = height - 50;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.font = '12px SpaceMono';
+    ctx.textAlign = 'center';
+    ctx.fillText(`ID-TRK:${Math.random().toString(36).substring(7).toUpperCase()} // STATUS: ACTIVE // AUTH:${Date.now()}`, width / 2, footerY);
+
+    // Proceduralny kod kreskowy (mały)
+    ctx.fillStyle = '#ffffff';
+    for (let i = 0; i < 150; i += Math.random() * 5 + 2) {
+        ctx.fillRect(400 + i, footerY - 15, Math.random() * 2 + 1, 20);
+    }
+
+    // 6. PIECZĘĆ MODERNY (Subtelny orzeł)
     ctx.save();
-    ctx.translate(width - 120, height - 120);
-    ctx.rotate(-0.2);
-    ctx.globalAlpha = 0.6;
-    ctx.strokeStyle = '#991b1b';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(-90, -35, 180, 70);
-    ctx.fillStyle = '#991b1b';
-    ctx.font = 'bold 20px Roboto';
-    ctx.fillText('BIELISKO', 0, -5);
-    ctx.fillText('POLICE', 0, 20);
+    ctx.translate(width - 100, 100);
+    ctx.globalAlpha = 0.3;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, 40, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 12px Roboto';
+    ctx.fillText('POLICE', 0, 5);
     ctx.restore();
 
     return canvas.toBuffer('image/png');

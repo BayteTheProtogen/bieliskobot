@@ -97,9 +97,39 @@ client.once(Events.ClientReady, async () => {
     startERLCPolling(client);
     startAutoUnbanJob(client);
     
+    // Auto-cleanup for Wanted People (12h expiry)
+    setInterval(() => cleanupWantedPeople(client), 1000 * 60 * 60); // Every hour
+    cleanupWantedPeople(client); // Run once on start
+
     // Uruchom WebUI API
     startWebServer(client, Number(process.env.PORT) || 3000);
 });
+
+async function cleanupWantedPeople(client: Client) {
+    console.log('[CLEANUP] Sprawdzanie wygasłych poszukiwań...');
+    const POSZUKIWANI_CHANNEL_ID = '1491176702586523769';
+    const expirationLimit = new Date(Date.now() - 12 * 60 * 60 * 1000); // 12h ago
+
+    try {
+        const expired = await (prisma as any).wantedPerson.findMany({
+            where: { createdAt: { lt: expirationLimit } }
+        });
+
+        if (expired.length === 0) return;
+
+        const channel = await client.channels.fetch(POSZUKIWANI_CHANNEL_ID).catch(() => null) as TextChannel;
+
+        for (const person of expired) {
+            console.log(`[CLEANUP] Usuwanie wygasłego poszukiwania: ${person.targetNick}`);
+            if (channel && person.messageId) {
+                await channel.messages.delete(person.messageId).catch(() => null);
+            }
+            await (prisma as any).wantedPerson.delete({ where: { id: person.id } }).catch(() => null);
+        }
+    } catch (err) {
+        console.error('[CLEANUP] Błąd podczas czyszczenia poszukiwanych:', err);
+    }
+}
 
 client.on('interactionCreate', async interaction => {
     const POLICJA_CHANNEL = '1491082576130216037';
@@ -266,6 +296,28 @@ client.on('interactionCreate', async interaction => {
             );
 
             await interaction.showModal(modal);
+        } else if (customId.startsWith('wanted_finish_')) {
+            const POLICJA_ROLE = '1490253667910029412';
+            const memberRoles = interaction.member?.roles;
+            if (!memberRoles || !('cache' in memberRoles) || !(memberRoles as any).cache.has(POLICJA_ROLE)) {
+                await interaction.reply({ content: '🚫 Tylko funkcjonariusze mogą kończyć poszukiwania!', ephemeral: true });
+                return;
+            }
+
+            const targetNick = customId.replace('wanted_finish_', '');
+            await interaction.deferUpdate();
+
+            try {
+                const existing = await (prisma as any).wantedPerson.findUnique({ where: { targetNick } });
+                if (existing) {
+                    if (existing.messageId && interaction.channel) {
+                        await (interaction.channel as TextChannel).messages.delete(existing.messageId).catch(() => null);
+                    }
+                    await (prisma as any).wantedPerson.delete({ where: { targetNick } });
+                }
+            } catch (err) {
+                console.error('Error in wanted_finish button:', err);
+            }
         }
     } else if (interaction.isModalSubmit()) {
         const customId = interaction.customId;
