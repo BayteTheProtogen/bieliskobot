@@ -190,79 +190,7 @@ export async function handleInteractions(interaction: Interaction) {
         if (interaction.isButton()) {
             const { customId } = interaction;
 
-            if (customId.startsWith('kartoteka_wanted_toggle|')) {
-                const nick = customId.split('|')[1];
-                const wanted = await (prisma as any).wantedPerson.findUnique({ where: { targetNick: nick } });
-                
-                if (wanted) {
-                    await (prisma as any).wantedPerson.delete({ where: { targetNick: nick } });
-                    const POSZUKIWANI_CHANNEL_ID = '1491176702586523769';
-                    const channel = await interaction.client.channels.fetch(POSZUKIWANI_CHANNEL_ID);
-                    if (channel && channel.isTextBased()) {
-                        await (channel as any).send(`✅ **KARTOTEKA ADMIN**: Obywatel **${nick}** został wycofany z listy poszukiwanych.`);
-                    }
-                    return interaction.reply({ content: `✅ Usunięto **${nick}** z listy poszukiwanych. Odśwież kartotekę.`, ephemeral: true });
-                } else {
-                    const modal = new ModalBuilder()
-                        .setCustomId(`kartoteka_wanted_modal|${nick}`)
-                        .setTitle(`Wystaw List Gończy: ${nick}`);
-                    
-                    const reasonInput = new TextInputBuilder()
-                        .setCustomId('reason')
-                        .setLabel('Powód poszukiwań')
-                        .setPlaceholder('Np. Napad na bank, Ucieczka przed LEO...')
-                        .setStyle(TextInputStyle.Paragraph)
-                        .setRequired(true);
-                    
-                    modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(reasonInput));
-                    return interaction.showModal(modal);
-                }
-            }
-
-            if (customId.startsWith('kartoteka_add_note|')) {
-                const nick = customId.split('|')[1];
-                const modal = new ModalBuilder()
-                    .setCustomId(`kartoteka_note_modal|${nick}`)
-                    .setTitle(`Dodaj Notatkę Służbową: ${nick}`);
-                
-                const noteInput = new TextInputBuilder()
-                    .setCustomId('note')
-                    .setLabel('Treść notatki / ostrzeżenia')
-                    .setPlaceholder('Np. Podejrzane zachowanie w dzielnicy przemysłowej, Ostrzeżenie za brawurową jazdę...')
-                    .setStyle(TextInputStyle.Paragraph)
-                    .setRequired(true);
-                
-                modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(noteInput));
-                return interaction.showModal(modal);
-            }
-
-            if (customId.startsWith('kartoteka_clear_req|')) {
-                const nick = customId.split('|')[1];
-                const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                    new ButtonBuilder()
-                        .setCustomId(`kartoteka_clear_execute|${nick}`)
-                        .setLabel('POTWIERDZAM WYMAZANIE REKORDÓW')
-                        .setStyle(ButtonStyle.Danger)
-                );
-                
-                return interaction.reply({ 
-                    content: `### ⚠️ UWAGA: CZYSZCZENIE AKT\nCzy na pewno chcesz usunąć **całą historię kar** (mandaty, areszty) dla obywatela **${nick}**?\nTej operacji nie można cofnąć.`, 
-                    components: [row],
-                    ephemeral: true 
-                });
-            }
-
-            if (customId.startsWith('kartoteka_clear_execute|')) {
-                const nick = customId.split('|')[1];
-                const citizen = await prisma.citizen.findFirst({ where: { robloxNick: { equals: nick, mode: 'insensitive' } } });
-                
-                if (citizen) {
-                    await (prisma as any).fineLog.deleteMany({ where: { citizenId: citizen.discordId } });
-                    await (prisma as any).arrestLog.deleteMany({ where: { citizenId: citizen.discordId } });
-                }
-                
-                return interaction.reply({ content: `🧹 Kartoteka obywatela **${nick}** została wyczyszczona.`, ephemeral: true });
-            }
+            // Handlery kartoteki (wanted_toggle, add_note, clear_req, clear_execute) tymczasowo usunięte.
             
             if (customId.startsWith('veh_form|')) {
                 const pendingId = customId.split('|')[1];
@@ -1210,74 +1138,7 @@ export async function handleInteractions(interaction: Interaction) {
         } else if (interaction.isModalSubmit()) {
             const { customId } = interaction;
 
-            if (customId.startsWith('kartoteka_wanted_modal|')) {
-                const nick = customId.split('|')[1];
-                const reason = interaction.fields.getTextInputValue('reason');
-                await interaction.reply({ content: 'Wystawianie listu gończego... 🚨', ephemeral: true });
-
-                try {
-                    const { generateWantedPoster } = await import('../services/canvas');
-                    const { getUserIdByUsername, getAvatarBust } = await import('../services/roblox');
-                    
-                    const robloxId = await getUserIdByUsername(nick);
-                    const avatarUrl = robloxId ? await getAvatarBust(robloxId) : null;
-                    const buffer = await generateWantedPoster(nick, reason, avatarUrl || '');
-                    const attachment = new AttachmentBuilder(buffer, { name: `wanted_${nick}.png` });
-
-                    const POSZUKIWANI_CHANNEL_ID = '1491176702586523769';
-                    const channel = await interaction.client.channels.fetch(POSZUKIWANI_CHANNEL_ID);
-                    if (!channel || !channel.isTextBased()) return interaction.followUp({ content: 'Nie odnaleziono kanału #poszukiwani.', ephemeral: true });
-
-                    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                        new ButtonBuilder()
-                            .setCustomId(`wanted_finish_${nick}`)
-                            .setLabel('ZAKOŃCZ POSZUKIWANIA')
-                            .setStyle(ButtonStyle.Danger)
-                    );
-
-                    const posterMsg = await (channel as any).send({
-                        content: `🚨 **NOWY LIST GOŃCZY (Z KARTOTEKI)**\nZ polecenia funkcjonariusza <@${interaction.user.id}>`,
-                        files: [attachment],
-                        components: [row]
-                    });
-
-                    await (prisma as any).wantedPerson.create({
-                        data: {
-                            targetNick: nick,
-                            robloxId: robloxId || null,
-                            reason: reason,
-                            officerDiscordId: interaction.user.id,
-                            messageId: posterMsg.id
-                        }
-                    });
-
-                    await interaction.followUp({ content: `✅ Pomyślnie wystawiono list gończy za **${nick}**. Odśwież kartotekę.`, ephemeral: true });
-                } catch (err) {
-                    console.error('Wanted Modal Error:', err);
-                    await interaction.followUp({ content: '❌ Błąd podczas wystawiania listu gończego.', ephemeral: true });
-                }
-                return;
-            }
-
-            if (customId.startsWith('kartoteka_note_modal|')) {
-                const nick = customId.split('|')[1];
-                const note = interaction.fields.getTextInputValue('note');
-                
-                const target = await prisma.citizen.findFirst({ where: { robloxNick: { equals: nick, mode: 'insensitive' } } });
-                if (!target) return interaction.reply({ content: 'Nie znaleziono obywatela.', ephemeral: true });
-
-                await (prisma as any).fineLog.create({
-                    data: {
-                        citizenId: target.discordId,
-                        playerNick: target.robloxNick,
-                        officerDiscordId: interaction.user.id,
-                        reason: `[NOTATKA] ${note}`,
-                        amount: 0
-                    }
-                });
-
-                return interaction.reply({ content: `📝 Dodano notatkę służbową do akt obywatela **${nick}**. Odśwież kartotekę.`, ephemeral: true });
-            }
+            // Handlery modali kartoteki (wanted_modal, note_modal) tymczasowo usunięte.
 
             if (customId.startsWith('admin_veh_edit_modal|')) {
                 const oldPlate = (customId.split('|')[1] || '').toUpperCase();

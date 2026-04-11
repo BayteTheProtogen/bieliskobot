@@ -110,25 +110,7 @@ export const kartotekaCommand = {
             .setFooter({ text: 'CONFIDENTIAL • Zintegrowany System Bezpieczeństwa Bieliska' });
 
         const components: ActionRowBuilder<ButtonBuilder>[] = [];
-        const member = await interaction.guild?.members.fetch(interaction.user.id);
-        
-        if (member?.roles.cache.has(POLICJA_ROLE)) {
-            const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`kartoteka_wanted_toggle|${citizen.robloxNick}`)
-                    .setLabel(wanted ? 'WYCOFAJ LIST GOŃCZY' : 'WYSTAW LIST GOŃCZY')
-                    .setStyle(wanted ? ButtonStyle.Success : ButtonStyle.Danger),
-                new ButtonBuilder()
-                    .setCustomId(`kartoteka_add_note|${citizen.robloxNick}`)
-                    .setLabel('DODAJ NOTATKĘ')
-                    .setStyle(ButtonStyle.Primary),
-                new ButtonBuilder()
-                    .setCustomId(`kartoteka_clear_req|${citizen.robloxNick}`)
-                    .setLabel('CZYŚĆ REKORDY')
-                    .setStyle(ButtonStyle.Secondary)
-            );
-            components.push(row);
-        }
+        // Administratywne przyciski kartoteki tymczasowo usunięte na prośbę użytkownika.
 
         await interaction.editReply({ 
             embeds: [embed], 

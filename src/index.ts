@@ -14,7 +14,7 @@ import { handleInteractions } from './handlers/interactions';
 import { handleKasynoInteractions } from './handlers/kasynoInteractions';
 import { rejestracjaCommand } from './commands/rejestracja';
 import { rejestracjaAdminCommands } from './commands/rejestracjaAdmin';
-import { poszukiwanieCommand } from './commands/poszukiwanie';
+// import { poszukiwanieCommand } from './commands/poszukiwanie'; // Tymczasowo usunięte
 import { panelCommand } from './commands/panel';
 import { rybyCommand } from './commands/ryby';
 import { dyzuryCommand } from './commands/dyzury';
@@ -82,7 +82,7 @@ client.once(Events.ClientReady, async () => {
                 kartotekaCommand.data.toJSON(),
                 rejestracjaCommand.data.toJSON(),
                 rejestracjaAdminCommands.data.toJSON(),
-                poszukiwanieCommand.data.toJSON(),
+                // poszukiwanieCommand.data.toJSON(), // Tymczasowo usunięte
                 panelCommand.data.toJSON(),
                 rybyCommand.data.toJSON(),
                 dyzuryCommand.data.toJSON(),
@@ -206,7 +206,7 @@ client.on('interactionCreate', async interaction => {
             } catch (err) {
                 if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: '❌ Wystąpił błąd podczas sprawdzania kartoteki.', ephemeral: true });
             }
-        } else if (interaction.commandName === 'poszukiwanie') {
+        /* } else if (interaction.commandName === 'poszukiwanie') {
             const memberRoles = interaction.member?.roles;
             const isPolicja = memberRoles && 'cache' in memberRoles && (memberRoles as any).cache.has(POLICJA_ROLE);
             
@@ -219,7 +219,7 @@ client.on('interactionCreate', async interaction => {
             } catch (err) {
                 console.error('Error executing poszukiwanie:', err);
                 if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: '❌ Błąd systemu poszukiwań.', ephemeral: true });
-            }
+            } */
         } else if (interaction.commandName === 'panel') {
             try {
                 await panelCommand.execute(interaction);
