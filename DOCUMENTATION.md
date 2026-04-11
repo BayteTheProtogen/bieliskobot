@@ -45,8 +45,9 @@ Zaawansowany system finansowy z podziałem na gotówkę w kieszeni i środki w b
 *   `/przelej [odbiorca_nick] [kwota]` – Przelew gotówki innemu graczowi (wymaga potwierdzenia przyciskiem).
 
 ### Zarabianie:
-*   `/praca` – Praca stała (2 500 zł), dostępna co 24h. Wymaga rangi **Cywil**.
+*   `/praca` – Praca stała (podstawa 2 500 zł), dostępna co 24h. Wynagrodzenie skaluje się w zależności od posiadanej rangi (np. Policja: 4 200 zł, Ratownik: 4 000 zł, Pomoc Drogowa: 3 800 zł).
 *   `/dorobka` – Szybkie zlecenia (250-500 zł), dostępne co 6h.
+*   **Rybołówstwo**: Możliwość zakupu sprzętu w sklepie i składania raportów z połowów (`/ryby`).
 
 ### Administracja Portfelem:
 *   `/eco-admin [opcja] [nick] [kwota]` – Opcje: `sprawdz`, `dodaj`, `zabierz`, `ustaw`. Dostępne tylko dla rangi Owner.
@@ -71,13 +72,31 @@ Dostępne wyłącznie na kanale administracyjnym (`1490274396391211158`).
 *   `!bb` *(bez argumentów)* – Wyświetla stronę pomocy.
 
 ### 🤖 Detekcja Banów In-Game:
-Bot co **2 minuty** odpytuje ER:LC API w poszukiwaniu akcji moderacyjnych (`:ban`, `:kick`, `:unban`) wykonanych bezpośrednio w grze.
-Jeśli wykryje nową akcję, wysyła **konwersację DM** do odpowiedzialnej osoby:
-1.  **Bot:** "Dlaczego to zrobiłeś?" – moderator odpowiada.
-2.  **Bot:** "Na ile czasu?" – moderator podaje godziny lub `permban`.
-3.  Cała akcja jest rejestrowana w systemie tak samo jak normalne `!bb`.
+Bot co **2 minuty** odpytuje ER:LC API w poszukiwaniu akcji moderacyjnych (`:ban`, `:kick`, `:unban`) wykonanych bezpośredniu w grze.
+Jeśli wykryje nową akcję, wysyła **konwersację DM** do odpowiedzialnej osoby w celu uzupełnienia powodu i czasu kary.
+
+### ⏱️ Dyżury i Wezwania:
+*   `/dyzury [użytkownik]` – Wyświetla statystyki czasu pracy moderatora (całkowity czas, ostatnie 7 dni, obecny status).
+*   `/wezwij [gracz]` – Oficjalne wezwanie gracza na VC (Kanał: `#Wezwania`). Wysyła PM w grze oraz DM na Discordzie z przyciskiem dołączenia do kanału głosowego.
+*   **Personalizacja Logów**: Akcje moderacyjne są logowane z unikalnymi emotkami (🛑, 👟, ⚠️) oraz wyświetlają **Nick** moderatora zamiast ID.
 
 > ⚠️ Wymaga, aby moderator miał wyrobiony dowód osobisty (konto Roblox powiązane z Discordem).
+
+---
+
+## 🌐 Web Panel Zarządzania
+
+Zaawansowany pulpit nawigacyjny (Dashboard) umożliwiający zarządzanie serwerem bez otwierania Discorda czy Robloxa.
+
+### Główne Moduły:
+*   **Lista Graczy (Center)**: Podgląd graczy online na serwerze ER:LC wraz z ich uprawnieniami i opcjami szybkiej akcji (Ban/Kick/Warn).
+*   **Logi Moderacyjne (Left sidebar)**: Historia akcji z bazy danych. Karta "Moje Akcje" oraz "Wszystkie" dla pełnego wglądu w pracę zespołu.
+*   **Logi Serwerowe (Right sidebar)**: Podgląd na żywo wydarzeń z gry (Kill Log oraz Command Log).
+*   **Status Dyżuru**: Możliwość ręcznego rozpoczęcia i zakończenia sesji pracy z poziomu panelu.
+
+### Technologia:
+*   **Real-time**: Logi serwerowe i lista graczy odświeżają się automatycznie.
+*   **Bezpieczeństwo**: Dostęp autoryzowany unikalnym tokenem (komenda `/panel`), wygasającym po 12 godzinach.
 
 ---
 

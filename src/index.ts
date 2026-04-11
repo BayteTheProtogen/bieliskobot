@@ -18,6 +18,7 @@ import { poszukiwanieCommand } from './commands/poszukiwanie';
 import { panelCommand } from './commands/panel';
 import { rybyCommand } from './commands/ryby';
 import { dyzuryCommand } from './commands/dyzury';
+import { wezwijCommand } from './commands/wezwij';
 import { erlcModeration } from './services/erlc';
 import { initVision } from './services/vision';
 import { generatePrisonerCard, generateArrestCard, generateKartotekaCard } from './services/canvas';
@@ -83,7 +84,8 @@ client.once(Events.ClientReady, async () => {
                 poszukiwanieCommand.data.toJSON(),
                 panelCommand.data.toJSON(),
                 rybyCommand.data.toJSON(),
-                dyzuryCommand.data.toJSON()
+                dyzuryCommand.data.toJSON(),
+                wezwijCommand.data.toJSON()
             ] },
         );
         console.log('Successfully reloaded application (/) commands.');
@@ -232,6 +234,8 @@ client.on('interactionCreate', async interaction => {
             await rybyCommand.execute(interaction);
         } else if (interaction.commandName === 'dyzury') {
             await dyzuryCommand.execute(interaction);
+        } else if (interaction.commandName === 'wezwij') {
+            await wezwijCommand.execute(interaction);
         }
     } else if (interaction.isButton()) {
         const customId = interaction.customId;
