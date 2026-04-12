@@ -180,3 +180,10 @@ model BanConversation {
   tempDuration  String?
   createdAt     DateTime @default(now())
 }
+
+model StartBonus {
+  id        Int      @id @default(autoincrement())
+  robloxId  String   @unique
+  discordId String   @unique
+  createdAt DateTime @default(now())
+}

@@ -1727,6 +1727,25 @@ export async function handleInteractions(interaction: Interaction) {
                         return interaction.editReply({ content: `🚫 To konto Roblox jest już przypisane do innego obywatela (<@${duplicate.discordId}>)! Jeden profil Roblox może mieć tylko jeden dowód.` });
                     }
 
+                    // --- LOGIKA BONUSU STARTOWEGO ---
+                    const startBonus = await (prisma as any).startBonus.findFirst({
+                        where: {
+                            OR: [
+                                { robloxId: robloxId },
+                                { discordId: interaction.user.id }
+                            ]
+                        }
+                    });
+
+                    let initialBank = 0;
+                    let receivedBonus = false;
+
+                    if (!startBonus) {
+                        initialBank = 4000;
+                        receivedBonus = true;
+                    }
+                    // --------------------------------
+
                     // Zapisz do bazy
                     const citizenData = {
                         discordId: interaction.user.id,
@@ -1738,6 +1757,7 @@ export async function handleInteractions(interaction: Interaction) {
                         gender,
                         citizenship,
                         citizenNumber,
+                        bank: initialBank
                     };
 
                     const savedCitizen = await prisma.citizen.upsert({
@@ -1753,11 +1773,26 @@ export async function handleInteractions(interaction: Interaction) {
                     const buffer = await generateIDCard(savedCitizen, pfp);
                     const attachment = new AttachmentBuilder(buffer, { name: 'dowod.png' });
 
+                    // Zapisz fakt przyznania bonusu (jeśli przyznano)
+                    if (receivedBonus) {
+                        try {
+                            await (prisma as any).startBonus.create({
+                                data: {
+                                    robloxId: robloxId,
+                                    discordId: interaction.user.id
+                                }
+                            });
+                        } catch (bonusErr) {
+                            console.error('Failed to save StartBonus record:', bonusErr);
+                        }
+                    }
+
                     // Try sending DM
                     let dmSent = true;
                     try {
                         const sentMsg = await interaction.user.send({
-                            content: `Twój elektroniczny dowód osobisty został pomyślnie zapisany w systemie. Oto kopia:`,
+                            content: `Twój elektroniczny dowód osobisty został pomyślnie zapisany w systemie. Oto kopia:` + 
+                                     (receivedBonus ? `\n\n🎁 **BONUS STARTOWY:** Z okazji wyrobienia Twojego pierwszego dowodu, na Twoje konto w banku wpłynęło **4.000 zł**! Powodzenia w Bielisku!` : ''),
                             files: [attachment]
                         });
                         await logBotDM(interaction.client, interaction.user.id, sentMsg, 'ID_CARD');
@@ -1793,7 +1828,10 @@ export async function handleInteractions(interaction: Interaction) {
                         console.error('Błąd zmiany pseudonimu lub dodania roli (brak uprawnień lub błąd API)', e);
                     }
 
-                    await interaction.editReply({ content: '✅ Dowód wyrobiony pomyślnie!' });
+                    await interaction.editReply({ 
+                        content: '✅ Dowód wyrobiony pomyślnie!' + 
+                                 (receivedBonus ? '\n💰 Otrzymałeś **4.000 zł** bonusu startowego do banku!' : '') 
+                    });
 
                 } catch (e) {
                     console.error(e);
