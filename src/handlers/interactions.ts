@@ -758,6 +758,18 @@ export async function handleInteractions(interaction: Interaction) {
                         })
                     ]);
                     
+                    // Nadanie rangi (jeśli przypisana do przedmiotu)
+                    if (item.roleId && interaction.guild) {
+                        try {
+                            const member = await interaction.guild.members.fetch(interaction.user.id);
+                            if (member && !member.roles.cache.has(item.roleId)) {
+                                await member.roles.add(item.roleId);
+                            }
+                        } catch (roleErr) {
+                            console.error('Błąd podczas nadawania rangi po zakupie:', roleErr);
+                        }
+                    }
+
                     // Proceduralny Paragon (Graphic)
                     const buffer = await generateReceiptCard({
                         itemName: item.name,
