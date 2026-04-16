@@ -673,6 +673,7 @@ export async function handleInteractions(interaction: Interaction) {
                 await prisma.inventory.deleteMany({ where: { discordId: targetDiscordId } });
                 
                 // Powiadomienie DM (logBotDM)
+                const citizen = await prisma.citizen.findUnique({ where: { discordId: targetDiscordId } });
                 if (citizen) {
                     try {
                         const targetUser = await interaction.client.users.fetch(targetDiscordId);
