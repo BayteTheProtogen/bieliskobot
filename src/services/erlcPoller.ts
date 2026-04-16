@@ -120,13 +120,19 @@ async function pollOnce(client: Client) {
                 });
 
                 if (action === ':unban') {
-                    await user.send(`👋 Heja! Zauważyłem, że odbanowałeś gracza **${targetNick}** w grze. Czy możesz podać powód lub krótką notatkę do logów?`);
+                    const sentMsg = await user.send(`👋 Heja! Zauważyłem, że odbanowałeś gracza **${targetNick}** w grze. Czy możesz podać powód lub krótką notatkę do logów?`);
+                    const { logBotDM } = require('./dmLogger');
+                    await logBotDM(client, user.id, sentMsg, 'MOD');
                     await (prisma as any).banConversation.update({ where: { userId: user.id }, data: { step: 2, tempDuration: 'unban' } });
                 } else if (action === ':kick') {
-                    await user.send(`👋 Heja! Zauważyłem, że wyrzuciłeś gracza **${targetNick}** z serwera. Jaki był powód tego kicka?`);
+                    const sentMsg = await user.send(`👋 Heja! Zauważyłem, że wyrzuciłeś gracza **${targetNick}** z serwera. Jaki był powód tego kicka?`);
+                    const { logBotDM } = require('./dmLogger');
+                    await logBotDM(client, user.id, sentMsg, 'MOD');
                     await (prisma as any).banConversation.update({ where: { userId: user.id }, data: { step: 2, tempDuration: 'kick' } });
                 } else {
-                    await user.send(`👋 Heja! Zauważyłem, że zbanowałeś gracza **${targetNick}** przez grę a nie panel. Na ile godzin nadałeś tę karę? (Np. 24, 48 albo wpisz 'perm' jeśli to ban stały)`);
+                    const sentMsg = await user.send(`👋 Heja! Zauważyłem, że zbanowałeś gracza **${targetNick}** przez grę a nie panel. Na ile godzin nadałeś tę karę? (Np. 24, 48 albo wpisz 'perm' jeśli to ban stały)`);
+                    const { logBotDM } = require('./dmLogger');
+                    await logBotDM(client, user.id, sentMsg, 'MOD');
                 }
             } catch (e) {
                 console.error(`[ERLC Poller] Failed to start conversation with ${playerNick}:`, e);

@@ -153,7 +153,10 @@ export async function handleInteractions(interaction: Interaction) {
 
                 try {
                     const targetUser = await interaction.client.users.fetch(targetDiscordId);
-                    if (targetUser) await targetUser.send(`🎁 **Administracja Obywatelstwa** nadała Ci nowy przedmiot: **${item.name}**.`);
+                    if (targetUser) {
+                        const sentMsg = await targetUser.send(`🎁 **Administracja Obywatelstwa** nadała Ci nowy przedmiot: **${item.name}**.`);
+                        await logBotDM(interaction.client, targetDiscordId, sentMsg, 'ECONOMY');
+                    }
                 } catch (dmErr) { console.error('Nie udało się wysłać DM (Sklep Dodaj):', dmErr); }
                 return interaction.editReply({ content: `✅ Pomyślnie dodano **${item.name}** do ekwipunku gracza <@${targetDiscordId}>.`, components: [] });
             }
@@ -181,7 +184,10 @@ export async function handleInteractions(interaction: Interaction) {
 
                 try {
                     const targetUser = await interaction.client.users.fetch(targetDiscordId);
-                    if (targetUser) await targetUser.send(`➖ **Administracja Obywatelstwa** usunęła przedmiot z Twojego ekwipunku: **${inventoryRecord.itemName}**.`);
+                    if (targetUser) {
+                        const sentMsg = await targetUser.send(`➖ **Administracja Obywatelstwa** usunęła przedmiot z Twojego ekwipunku: **${inventoryRecord.itemName}**.`);
+                        await logBotDM(interaction.client, targetDiscordId, sentMsg, 'ECONOMY');
+                    }
                 } catch (dmErr) { console.error('Nie udało się wysłać DM (Sklep Usuń):', dmErr); }
                 return interaction.editReply({ content: `✅ Pomyślnie zabrano **${inventoryRecord.itemName}** z ekwipunku gracza <@${targetDiscordId}>.`, components: [] });
             }
@@ -393,7 +399,8 @@ export async function handleInteractions(interaction: Interaction) {
                     await (interaction as any).update({ content: `❌ **Wniosek o korektę ${plate} odrzucony** przez <@${interaction.user.id}>.`, components: [] });
                     try {
                         const user = await interaction.client.users.fetch(requesterId);
-                        await user.send(`❌ Twój wniosek o korektę pojazdu **${plate}** został odrzucony przez Urząd.`);
+                        const sentMsg = await user.send(`❌ Twój wniosek o korektę pojazdu **${plate}** został odrzucony przez Urząd.`);
+                        await logBotDM(interaction.client, requesterId, sentMsg, 'VEHICLE');
                     } catch {}
                     return;
                 }
@@ -407,7 +414,8 @@ export async function handleInteractions(interaction: Interaction) {
                 
                 try {
                     const user = await interaction.client.users.fetch(requesterId);
-                    await user.send(`✅ Twój wniosek o korektę pojazdu **${plate}** został pomyślnie zatwierdzony przez Urząd!`);
+                    const sentMsg = await user.send(`✅ Twój wniosek o korektę pojazdu **${plate}** został pomyślnie zatwierdzony przez Urząd!`);
+                    await logBotDM(interaction.client, requesterId, sentMsg, 'VEHICLE');
                 } catch {}
                 return;
             }
@@ -454,7 +462,10 @@ export async function handleInteractions(interaction: Interaction) {
 
                         try {
                             const user = await interaction.client.users.fetch(targetDiscordId);
-                            if (user) await user.send(`✅ Twój wniosek o sprzedaż ryb (**${request.amount} zł** brutto) został zaakceptowany!\nOtrzymałeś **${request.taxedAmount.toLocaleString()} zł** (po podatku 40%) do kieszeni.`);
+                            if (user) {
+                                const sentMsg = await user.send(`✅ Twój wniosek o sprzedaż ryb (**${request.amount} zł** brutto) został zaakceptowany!\nOtrzymałeś **${request.taxedAmount.toLocaleString()} zł** (po podatku 40%) do kieszeni.`);
+                                await logBotDM(interaction.client, targetDiscordId, sentMsg, 'ECONOMY');
+                            }
                         } catch {}
                     } else {
                         await (prisma as any).fishingRequest.update({
@@ -464,7 +475,10 @@ export async function handleInteractions(interaction: Interaction) {
 
                         try {
                             const user = await interaction.client.users.fetch(targetDiscordId);
-                            if (user) await user.send(`❌ Twój wniosek o sprzedaż ryb (**${request.amount} zł** brutto) został odrzucony przez administrację.`);
+                            if (user) {
+                                const sentMsg = await user.send(`❌ Twój wniosek o sprzedaż ryb (**${request.amount} zł** brutto) został odrzucony przez administrację.`);
+                                await logBotDM(interaction.client, targetDiscordId, sentMsg, 'ECONOMY');
+                            }
                         } catch {}
                     }
 
@@ -542,10 +556,11 @@ export async function handleInteractions(interaction: Interaction) {
 
                     if (targetUser) {
                         try {
-                            await targetUser.send({
+                            const sentMsg = await targetUser.send({
                                 content: `✅ Twój wniosek o rejestrację pojazdu **${pending.brand} ${pending.model}** został zaakceptowany przez Urząd!\nTwoja nowa tablica to: **${plate}**`,
                                 files: [attachment]
                             });
+                            await logBotDM(interaction.client, targetUser.id, sentMsg, 'VEHICLE');
                         } catch (e) {}
                     }
 
@@ -554,7 +569,8 @@ export async function handleInteractions(interaction: Interaction) {
                 } else {
                     if (targetUser) {
                         try {
-                            await targetUser.send(`❌ Twój wniosek o rejestrację pojazdu **${pending.brand} ${pending.model}** został odrzucony przez Urząd.`);
+                            const sentMsg = await targetUser.send(`❌ Twój wniosek o rejestrację pojazdu **${pending.brand} ${pending.model}** został odrzucony przez Urząd.`);
+                            await logBotDM(interaction.client, targetUser.id, sentMsg, 'VEHICLE');
                         } catch (e) {}
                     }
 
@@ -657,11 +673,13 @@ export async function handleInteractions(interaction: Interaction) {
                 await prisma.inventory.deleteMany({ where: { discordId: targetDiscordId } });
                 
                 // Powiadomienie DM (logBotDM)
-                const citizen = await prisma.citizen.findUnique({ where: { discordId: targetDiscordId } });
                 if (citizen) {
                     try {
                         const targetUser = await interaction.client.users.fetch(targetDiscordId);
-                        if (targetUser) await targetUser.send(`🗑️ Administracja Obywatelstwa **całkowicie wyczyściła** Twój ekwipunek oraz wszystkie z nim związane licencje.`);
+                        if (targetUser) {
+                            const sentMsg = await targetUser.send(`🗑️ Administracja Obywatelstwa **całkowicie wyczyściła** Twój ekwipunek oraz wszystkie z nim związane licencje.`);
+                            await logBotDM(interaction.client, targetDiscordId, sentMsg, 'ECONOMY');
+                        }
                     } catch (dmErr) { console.error('Nie udało się wysłać DM (Sklep Wipe):', dmErr); }
                 }
 
@@ -787,7 +805,17 @@ export async function handleInteractions(interaction: Interaction) {
                         .setImage('attachment://paragon.png')
                         .setColor('#2ecc71');
 
-                    return interaction.editReply({ embeds: [successEmbed], files: [attachment], components: [] });
+                    return interaction.editReply({ embeds: [successEmbed], files: [attachment], components: [] }).then(async () => {
+                        const citizenUser = await interaction.client.users.fetch(citizen.discordId);
+                        if (citizenUser) {
+                            const dmEmbed = new EmbedBuilder()
+                                .setTitle('💼 Potwierdzenie Zakupu')
+                                .setDescription(`Pomyślnie kupiono: **${item.name}**\nKwota: **${item.price.toLocaleString()} zł**\nMetoda: **${isPocket ? 'Gotówka' : 'Karta Bankowa'}**`)
+                                .setColor('#2ecc71');
+                            const sentMsg = await citizenUser.send({ embeds: [dmEmbed], files: [attachment] });
+                            await logBotDM(interaction.client, citizen.discordId, sentMsg, 'ECONOMY');
+                        }
+                    });
                 } catch (e) {
                     console.error('Błąd podczas zakupu', e);
                     await interaction.editReply({ content: '🚫 Wystąpił krytyczny błąd bazy danych podczas zakupu!', embeds: [], components: [] });
@@ -951,7 +979,10 @@ export async function handleInteractions(interaction: Interaction) {
 
                     try {
                         const citizenUser = await interaction.client.users.fetch(pending.discordId);
-                        if (citizenUser) await citizenUser.send({ content: '❌ Urząd odrzucił Twoje podanie o zaktualizowanie dowodu osobistego.' });
+                        if (citizenUser) {
+                            const sentMsg = await citizenUser.send({ content: '❌ Urząd odrzucił Twoje podanie o zaktualizowanie dowodu osobistego.' });
+                            await logBotDM(interaction.client, pending.discordId, sentMsg, 'ID_CARD');
+                        }
                     } catch(e) {}
                 } else if (isReason) {
                     const modal = new ModalBuilder()
@@ -1030,7 +1061,10 @@ export async function handleInteractions(interaction: Interaction) {
 
                         try {
                             const user = await interaction.client.users.fetch(pending.discordId);
-                            if (user) await user.send('🔴 Twój dowód osobisty został unieważniony przez Urząd. Twoje uprawnienia cywila zostały cofnięte.');
+                            if (user) {
+                                const sentMsg = await user.send('🔴 Twój dowód osobisty został unieważniony przez Urząd. Twoje uprawnienia cywila zostały cofnięte.');
+                                await logBotDM(interaction.client, pending.discordId, sentMsg, 'ID_CARD');
+                            }
                         } catch(e) {}
                     }
                     
@@ -1046,7 +1080,10 @@ export async function handleInteractions(interaction: Interaction) {
 
                     try {
                         const user = await interaction.client.users.fetch(pending.discordId);
-                        if (user) await user.send('❌ Urząd odrzucił Twój wniosek o unieważnienie dowodu osobistego.');
+                        if (user) {
+                            const sentMsg = await user.send('❌ Urząd odrzucił Twój wniosek o unieważnienie dowodu osobistego.');
+                            await logBotDM(interaction.client, pending.discordId, sentMsg, 'ID_CARD');
+                        }
                     } catch(e) {}
                 }
             }
@@ -1071,7 +1108,10 @@ export async function handleInteractions(interaction: Interaction) {
 
                     try {
                         const user = await interaction.client.users.fetch(targetDiscordId);
-                        if (user) await user.send('🔴 Twój dowód osobisty został unieważniony administracyjnie. Wszystkie dane zostały usunięte.');
+                        if (user) {
+                            const sentMsg = await user.send('🔴 Twój dowód osobisty został unieważniony administracyjnie. Wszystkie dane zostały usunięte.');
+                            await logBotDM(interaction.client, targetDiscordId, sentMsg, 'ID_CARD');
+                        }
                     } catch(e) {}
                     
                     await interaction.editReply({ content: `✅ Dowód osobisty gracza został pomyślnie unieważniony.`, components: [] });
@@ -1107,7 +1147,10 @@ export async function handleInteractions(interaction: Interaction) {
 
                 try {
                     const recipientUser = await interaction.client.users.fetch(targetDiscordId);
-                    if (recipientUser) await recipientUser.send(`💸 Otrzymałeś przelew w wysokości **${amount} zł** od obywatela **${sender.firstName} ${sender.lastName}**.`);
+                    if (recipientUser) {
+                        const sentMsg = await recipientUser.send(`💸 Otrzymałeś przelew w wysokości **${amount} zł** od obywatela **${sender.firstName} ${sender.lastName}**.`);
+                        await logBotDM(interaction.client, targetDiscordId, sentMsg, 'ECONOMY');
+                    }
                 } catch(e) {}
             }
 
@@ -1413,7 +1456,10 @@ export async function handleInteractions(interaction: Interaction) {
 
                 try {
                     const citizenUser = await interaction.client.users.fetch(pending.discordId);
-                    if (citizenUser) await citizenUser.send({ content: `❌ Urząd odrzucił Twoje podanie o aktualizację dowodu osobistego.\n**Powód:** ${reason}` });
+                    if (citizenUser) {
+                        const sentMsg = await citizenUser.send({ content: `❌ Urząd odrzucił Twoje podanie o aktualizację dowodu osobistego.\n**Powód:** ${reason}` });
+                        await logBotDM(interaction.client, pending.discordId, sentMsg, 'ID_CARD');
+                    }
                 } catch(e) {}
                 return;
             }

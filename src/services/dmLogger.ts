@@ -2,11 +2,13 @@ import { Client, TextChannel, AttachmentBuilder, ActionRowBuilder, ButtonBuilder
 
 export const DM_LOG_CHANNEL_ID = '1490640702135079042';
 
+export type DMLogType = 'ID_CARD' | 'FINE' | 'UNBAN' | 'ARREST' | 'SUMMON' | 'VEHICLE' | 'ECONOMY' | 'MOD' | 'OTHER';
+
 /**
  * Logs a DM sent by the bot to a dedicated administrative channel.
  * Adds a button to allow admins to delete the original DM.
  */
-export async function logBotDM(client: Client, targetUserId: string, sentMessage: Message, type: 'ID_CARD' | 'FINE' | 'UNBAN' | 'ARREST') {
+export async function logBotDM(client: Client, targetUserId: string, sentMessage: Message, type: DMLogType) {
     try {
         const logChannel = await client.channels.fetch(DM_LOG_CHANNEL_ID) as TextChannel;
         if (!logChannel || !logChannel.isTextBased()) return;
@@ -15,11 +17,18 @@ export async function logBotDM(client: Client, targetUserId: string, sentMessage
             new AttachmentBuilder(att.url, { name: att.name || 'document.png' })
         );
 
+        let content = sentMessage.content || '';
+        if (sentMessage.embeds.length > 0) {
+            sentMessage.embeds.forEach((emb, i) => {
+                content += `\n\n**Embed ${i+1}:**\n${emb.title ? `__${emb.title}__\n` : ''}${emb.description || ''}`;
+            });
+        }
+
         const logEmbed = new EmbedBuilder()
             .setTitle(`📑 Log wysłanej wiadomości DM (${type})`)
-            .setColor(type === 'FINE' ? '#e74c3c' : '#3498db')
+            .setColor(type === 'FINE' || type === 'ARREST' ? '#e74c3c' : '#3498db')
             .setDescription(`Wiadomość wysłana do: <@${targetUserId}> (\`${targetUserId}\`)`)
-            .addFields({ name: 'Treść', value: sentMessage.content || '_Brak treści tekstowej_' })
+            .addFields({ name: 'Treść', value: content.substring(0, 1024) || '_Brak treści_' })
             .setTimestamp();
 
         const row = new ActionRowBuilder<ButtonBuilder>().addComponents(

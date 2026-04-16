@@ -425,7 +425,13 @@ export function startWebServer(client: Client, port: number = 3000) {
                         const targetCitizen = await (prisma as any).citizen.findFirst({ where: { robloxNick: { equals: targetNick, mode: 'insensitive' } }});
                         if (targetCitizen) {
                             const discordUser = await client.users.fetch(targetCitizen.discordId).catch(() => null);
-                            if (discordUser) discordUser.send(`⚠️ **Otrzymałeś ostrzeżenie od Administracji!**\n\n**Powód:** ${reason}`).catch(() => null);
+                            if (discordUser) {
+                                const sentMsg = await discordUser.send(`⚠️ **Otrzymałeś ostrzeżenie od Administracji!**\n\n**Powód:** ${reason}`).catch(() => null);
+                                if (sentMsg) {
+                                    const { logBotDM } = require('../services/dmLogger');
+                                    await logBotDM(client, targetCitizen.discordId, sentMsg, 'MOD');
+                                }
+                            }
                         }
                     }
 

@@ -66,7 +66,9 @@ export const wezwijCommand = {
                     );
 
                     try {
-                        await targetUser.send({ embeds: [embed], components: [row] });
+                        const sentMsg = await targetUser.send({ embeds: [embed], components: [row] });
+                        const { logBotDM } = require('../services/dmLogger');
+                        await logBotDM(interaction.client, citizen.discordId, sentMsg, 'SUMMON');
                         dmStatus = '✅ Wysłano DM na Discordzie';
                     } catch (dmErr) {
                         dmStatus = '❌ Zablokowane wiadomości DM';

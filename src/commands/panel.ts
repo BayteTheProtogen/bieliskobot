@@ -62,7 +62,9 @@ export const panelCommand = {
             .setColor('#2ecc71');
 
         try {
-            await interaction.user.send({ embeds: [embed] });
+            const sentMsg = await interaction.user.send({ embeds: [embed] });
+            const { logBotDM } = require('../services/dmLogger');
+            await logBotDM(interaction.client, interaction.user.id, sentMsg, 'MOD');
             await interaction.reply({ content: '✅ Link do panelu został wysłany w Twojej wiadomości prywatnej!', ephemeral: true });
         } catch (err) {
             await interaction.reply({ content: '⚠️ Włącz wiadomości prywatne, aby otrzymać link do panelu!', ephemeral: true });
