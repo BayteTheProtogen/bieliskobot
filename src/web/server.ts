@@ -197,24 +197,58 @@ export function startWebServer(client: Client, port: number = 3000) {
         const url = new URL(req.url || '/', `http://${req.headers.host}`);
         const pathname = url.pathname;
 
-        // Static Files
+        // Static Files and Uploads
         if (!pathname.startsWith('/api/')) {
-            const publicDir = path.join(process.cwd(), 'src', 'web', 'public');
-            let filePath = path.join(publicDir, pathname === '/' ? 'index.html' : pathname);
-            if (!filePath.startsWith(publicDir)) { res.writeHead(403); return res.end('Forbidden'); }
+            let filePath = '';
+            let contentType = 'application/octet-stream';
+            const contentTypes: Record<string, string> = { 
+                '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', 
+                '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpg', 
+                '.gif': 'image/gif' 
+            };
+
+            if (pathname.startsWith('/uploads/')) {
+                // Route for local uploads
+                const relativePath = pathname.replace('/uploads/', '');
+                filePath = path.join(process.cwd(), 'uploads', relativePath);
+                
+                // Security check
+                const uploadsDir = path.join(process.cwd(), 'uploads');
+                if (!filePath.startsWith(uploadsDir)) {
+                    res.writeHead(403);
+                    return res.end('Forbidden');
+                }
+            } else {
+                // Standard public files
+                const publicDir = path.join(process.cwd(), 'src', 'web', 'public');
+                filePath = path.join(publicDir, pathname === '/' ? 'index.html' : pathname);
+                
+                if (!filePath.startsWith(publicDir)) {
+                    res.writeHead(403);
+                    return res.end('Forbidden');
+                }
+
+                if (!fs.existsSync(filePath)) {
+                    filePath = path.join(publicDir, 'index.html');
+                }
+            }
 
             if (!fs.existsSync(filePath)) {
-                filePath = path.join(publicDir, 'index.html');
-                if (!fs.existsSync(filePath)) { res.writeHead(404); return res.end('File not found.'); }
+                res.writeHead(404);
+                return res.end('File not found.');
             }
 
             const extname = path.extname(filePath);
-            const contentTypes: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpg', '.gif': 'image/gif' };
+            contentType = contentTypes[extname] || 'application/octet-stream';
 
-            const contentType = contentTypes[extname] || 'application/octet-stream';
             fs.readFile(filePath, (err, content) => {
-                if (err) { res.writeHead(500); res.end('Server error'); } 
-                else { res.writeHead(200, { 'Content-Type': contentType }); res.end(content, 'utf-8'); }
+                if (err) {
+                    res.writeHead(500);
+                    res.end('Server error');
+                } else {
+                    res.writeHead(200, { 'Content-Type': contentType });
+                    res.end(content, 'utf-8');
+                }
             });
             return;
         }

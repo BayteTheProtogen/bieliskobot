@@ -2,6 +2,7 @@ import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, ActionR
 import { prisma } from '../services/db';
 import { detectVehicle, cropToVehicle } from '../services/vision';
 import { getVehicleListPage } from '../utils/vehicleList';
+import axios from 'axios';
 
 export const rejestracjaCommand = {
     data: new SlashCommandBuilder()
@@ -74,38 +75,34 @@ export const rejestracjaCommand = {
                         });
                     }
 
-                    const STORAGE_CHANNEL_ID = '1491131655778209923';
-                    const storageChannel = await interaction.client.channels.fetch(STORAGE_CHANNEL_ID);
-                    
+                    const { saveVehicleImage, getImageUrl } = await import('../services/storage');
                     let finalImageUrl = attachment.url;
-                    let storageMessageId = null;
+                    let storageMessageId: string | null = null;
 
-                    if (storageChannel && storageChannel.isTextBased()) {
-                        let fileToUpload: string | Buffer = attachment.url;
-                        let fileName = 'oryginalny.png';
-
-                        if (aiResult.box) {
-                            try {
-                                fileToUpload = await cropToVehicle(attachment.url, aiResult.box);
-                                fileName = 'auto_kadrowane.png';
-                            } catch (cropErr) {
-                                console.error('Crop error:', cropErr);
-                            }
+                    let fileBuffer: Buffer | null = null;
+                    if (aiResult.box) {
+                        try {
+                            fileBuffer = await cropToVehicle(attachment.url, aiResult.box);
+                        } catch (cropErr) {
+                            console.error('Crop error:', cropErr);
                         }
-
-                        const storageMsg = await (storageChannel as any).send({
-                            content: `📦 Cloud Storage: Wniosek od <@${interaction.user.id}>`,
-                            files: [new AttachmentBuilder(fileToUpload, { name: fileName })]
-                        });
-                        finalImageUrl = storageMsg.attachments.first()?.url || attachment.url;
-                        storageMessageId = storageMsg.id;
                     }
+
+                    // If we couldn't crop, use original
+                    if (!fileBuffer) {
+                        const response = await axios.get(attachment.url, { responseType: 'arraybuffer' });
+                        fileBuffer = Buffer.from(response.data);
+                    }
+
+                    // Save locally
+                    const filename = await saveVehicleImage(fileBuffer);
+                    finalImageUrl = getImageUrl(filename);
 
                     const pending = await (prisma as any).pendingVehicle.create({
                         data: {
                             ownerId: interaction.user.id,
                             imageUrl: finalImageUrl,
-                            storageMessageId,
+                            storageMessageId: null, // No longer using Discord message IDs for storage
                             aiConfidence: aiResult.confidence,
                             aiLabel: aiResult.label
                         }
