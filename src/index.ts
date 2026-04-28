@@ -410,13 +410,115 @@ client.on(Events.MessageCreate, async message => {
             { name: '⚖️ Wyrzucenie', value: '`!bb kick [nick] [powód]` - Wyrzuca gracza z gry.', inline: false },
             { name: '⛓️ Ban tymczasowy', value: '`!bb tempban [nick] [czas_h] [powód]` - Ban czasowy + stempel na dowód.', inline: false },
             { name: '💀 Permban', value: '`!bb permban [nick] [powód]` - Ban stały (Tylko Owner).', inline: false },
-            { name: '🔓 Unban', value: '`!bb unban [nick]` - Zdjęcie kary i czyszczenie bazy.', inline: false }
+            { name: '🔓 Unban', value: '`!bb unban [nick]` - Zdjęcie kary i czyszczenie bazy.', inline: false },
+            { name: '🔄 Odbudowa DB', value: '`!bb rebuilddb` - Rekonstrukcja utraconej bazy.', inline: false }
         )
         .setFooter({ text: 'RP Bielisko - System Moderacji' })
         .setTimestamp();
 
-    if (!command || !['kick', 'tempban', 'permban', 'unban'].includes(command)) {
+    if (!command || !['kick', 'tempban', 'permban', 'unban', 'rebuilddb'].includes(command)) {
         return message.reply({ embeds: [helpEmbed] });
+    }
+
+    if (command === 'rebuilddb') {
+        if (!message.member?.roles.cache.has(OWNER_ROLE_ID)) return message.reply('🚫 Brak uprawnień do przebudowy bazy danych!');
+        
+        await message.reply('⏳ Rozpoczynam skanowanie kanałów i rekonstrukcję bazy danych. To potrwa chwilę...');
+
+        try {
+            const publicChannel = await client.channels.fetch('1490011932068024370') as TextChannel;
+            const dmLogChannel = await client.channels.fetch('1490640702135079042') as TextChannel;
+
+            if (!publicChannel || !dmLogChannel) throw new Error("Kanały nie zostały znalezione.");
+
+            // Pobieranie logów DM (Discord ID)
+            const dmMessages: any[] = [];
+            let lastId: string | undefined = undefined;
+            while (true) {
+                const msgs: any = await dmLogChannel.messages.fetch({ limit: 100, before: lastId });
+                if (msgs.size === 0) break;
+                dmMessages.push(...msgs.values());
+                lastId = msgs.last()?.id;
+            }
+
+            const dmLogsExtracted = dmMessages.map(m => {
+                if (m.embeds.length > 0 && m.embeds[0].title?.includes('ID_CARD')) {
+                    const desc = m.embeds[0].description || '';
+                    const match = desc.match(/\(\`(\d+)\`\)/);
+                    if (match) return { discordId: match[1], time: m.createdTimestamp };
+                }
+                return null;
+            }).filter(x => x !== null);
+
+            // Pobieranie publicznych ogłoszeń o dowodzie (Dane obywatela)
+            const publicMessages: any[] = [];
+            lastId = undefined;
+            while (true) {
+                const msgs: any = await publicChannel.messages.fetch({ limit: 100, before: lastId });
+                if (msgs.size === 0) break;
+                publicMessages.push(...msgs.values());
+                lastId = msgs.last()?.id;
+            }
+
+            const { getUserInfo } = require('./services/roblox');
+            let reconstructed = 0;
+            let failed = 0;
+
+            for (const msg of publicMessages) {
+                if (msg.author.id !== client.user?.id) continue;
+                
+                const regex = /🪪 Obywatel \*\*([^\*]+)\*\* \(Z postacią \*\*([^\*]+)\*\*\)/;
+                const match = msg.content.match(regex);
+                if (!match) continue;
+
+                const fullName = match[1].trim();
+                const robloxNick = match[2].trim();
+                const nameParts = fullName.split(' ');
+                const firstName = nameParts[0] || 'Nieznane';
+                const lastName = nameParts.slice(1).join(' ') || 'Nieznane';
+
+                // Znajdź najbliższy log DM (dopasowanie czasowe do 15 sekund)
+                const closestDM = dmLogsExtracted.find((log: any) => Math.abs(log.time - msg.createdTimestamp) < 15000);
+
+                if (!closestDM) {
+                    failed++;
+                    continue;
+                }
+
+                try {
+                    const robloxUser = await getUserInfo(robloxNick);
+                    const robloxId = robloxUser ? robloxUser.id.toString() : `TEMP-${Math.floor(Math.random()*1000000)}`;
+
+                    const existing = await prisma.citizen.findUnique({ where: { discordId: closestDM.discordId } });
+                    if (!existing) {
+                        await prisma.citizen.create({
+                            data: {
+                                discordId: closestDM.discordId,
+                                robloxNick,
+                                robloxId,
+                                firstName,
+                                lastName,
+                                dob: "01.01.2000", // Zastępcze
+                                gender: "M",
+                                citizenship: "Bielisko",
+                                citizenNumber: `BI-${Math.floor(10000 + Math.random() * 90000)}`,
+                                bank: 0,
+                                pocket: 0
+                            }
+                        });
+                        reconstructed++;
+                    }
+                } catch (e) {
+                    failed++;
+                }
+            }
+
+            await message.channel.send(`✅ Zakończono! \nOdzyskano i zapisano: **${reconstructed}** obywateli.\nNie udało się dopasować: **${failed}** (Brak powiązanego logu DM w tym samym czasie).`);
+        } catch (e) {
+            console.error(e);
+            await message.channel.send('❌ Wystąpił błąd podczas odbudowy bazy.');
+        }
+        return;
     }
 
     // !bb kick [nick] [reason...]
