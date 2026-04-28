@@ -478,6 +478,74 @@ export function startWebServer(client: Client, port: number = 3000) {
                 res.writeHead(200); return res.end(JSON.stringify({ success: true }));
             }
 
+            if (pathname.startsWith('/api/dev/')) {
+                if (session!.discordId !== '1490053669830393996') {
+                    res.writeHead(403); return res.end(JSON.stringify({ error: 'Brak uprawnień właściciela.' }));
+                }
+
+                if (req.method === 'GET' && pathname === '/api/dev/stats') {
+                    const os = require('os');
+                    const citizens = await (prisma as any).citizen.count();
+                    const shifts = await (prisma as any).moderationShift.count();
+                    const activeShifts = await (prisma as any).moderationShift.count({ where: { endTime: null } });
+                    
+                    const uptime = process.uptime();
+                    const memory = process.memoryUsage();
+                    
+                    const stats = {
+                        system: {
+                            arch: os.arch(),
+                            platform: os.platform(),
+                            cpus: os.cpus().length,
+                            totalMem: Math.round(os.totalmem() / 1024 / 1024),
+                            freeMem: Math.round(os.freemem() / 1024 / 1024),
+                            uptimeSeconds: uptime,
+                            processMem: Math.round(memory.rss / 1024 / 1024)
+                        },
+                        bot: {
+                            ping: client.ws.ping,
+                            guilds: client.guilds.cache.size,
+                            users: client.users.cache.size
+                        },
+                        db: {
+                            citizens,
+                            shifts,
+                            activeShifts
+                        }
+                    };
+                    res.writeHead(200); return res.end(JSON.stringify(stats));
+                }
+                
+                if (req.method === 'GET' && pathname === '/api/dev/citizens') {
+                    const list = await (prisma as any).citizen.findMany({
+                        orderBy: { id: 'desc' },
+                        take: 100
+                    });
+                    res.writeHead(200); return res.end(JSON.stringify(list));
+                }
+
+                if (req.method === 'POST' && pathname === '/api/dev/query') {
+                    let body = '';
+                    await new Promise(resolve => {
+                        req.on('data', chunk => body += chunk.toString());
+                        req.on('end', resolve);
+                    });
+                    try {
+                        const { model, action, data } = JSON.parse(body);
+                        let result;
+                        if (action === 'findMany') result = await (prisma as any)[model].findMany(data || {});
+                        else if (action === 'deleteMany') result = await (prisma as any)[model].deleteMany(data || {});
+                        else if (action === 'updateMany') result = await (prisma as any)[model].updateMany(data || {});
+                        else throw new Error("Nieobsługiwana akcja dla Prisma.");
+                        res.writeHead(200); return res.end(JSON.stringify({ result }));
+                    } catch(e: any) {
+                        res.writeHead(400); return res.end(JSON.stringify({ error: e.message }));
+                    }
+                }
+                
+                return;
+            }
+
             res.writeHead(404); res.end(JSON.stringify({ error: 'Not found' }));
         } catch (error: any) {
             console.error('API Error:', error);

@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="pl" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terminal Dewelopera | BieliskoBot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['Fira Code', 'monospace'] },
+                    colors: {
+                        brand: { 400: '#a78bfa', 500: '#8b5cf6', 600: '#7c3aed' },
+                        dark: { 950: '#020617', 900: '#0f172a', 800: '#1e293b', 700: '#334155' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #020617; color: #f8fafc; background-image: radial-gradient(circle at 50% 0%, #1e293b 0%, #020617 70%); min-height: 100vh; }
+        .glass { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(16px); border: 1px solid rgba(148, 163, 184, 0.1); box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1); }
+        .glow { box-shadow: 0 0 15px rgba(139, 92, 246, 0.5); }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    </style>
+</head>
+<body class="p-4 md:p-8 flex flex-col gap-6">
+
+    <header class="flex justify-between items-center glass p-4 rounded-2xl">
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-brand-500 to-purple-800 flex items-center justify-center glow">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight">Konsola Dewelopera</h1>
+                <p class="text-sm text-slate-400">Tylko dla Ownera (ID: 1490053669830393996)</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <span id="connectionStatus" class="flex items-center gap-2 text-sm font-medium text-emerald-400 bg-emerald-400/10 px-3 py-1.5 rounded-full border border-emerald-400/20">
+                <span class="relative flex h-2 w-2">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                Połączono
+            </span>
+            <button onclick="window.location.href='/'" class="px-4 py-2 text-sm font-medium bg-dark-800 hover:bg-dark-700 rounded-xl transition-colors border border-white/5">
+                Wróć do Panelu
+            </button>
+        </div>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- System Stats -->
+        <div class="glass p-6 rounded-2xl flex flex-col gap-4">
+            <h2 class="text-lg font-semibold flex items-center gap-2 text-slate-200">
+                <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path></svg>
+                Zasoby Systemowe
+            </h2>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-dark-900/50 p-4 rounded-xl border border-white/5">
+                    <p class="text-xs text-slate-400 mb-1">Pamięć RAM</p>
+                    <p class="text-2xl font-bold font-mono text-brand-400" id="ramStat">-- MB</p>
+                    <p class="text-xs text-slate-500 mt-1" id="ramTotal">z -- MB</p>
+                </div>
+                <div class="bg-dark-900/50 p-4 rounded-xl border border-white/5">
+                    <p class="text-xs text-slate-400 mb-1">Uptime</p>
+                    <p class="text-xl font-bold font-mono text-emerald-400 mt-1" id="uptimeStat">--:--:--</p>
+                </div>
+                <div class="bg-dark-900/50 p-4 rounded-xl border border-white/5">
+                    <p class="text-xs text-slate-400 mb-1">Procesor</p>
+                    <p class="text-lg font-bold font-mono text-slate-300" id="cpuStat">-- x Core</p>
+                </div>
+                <div class="bg-dark-900/50 p-4 rounded-xl border border-white/5">
+                    <p class="text-xs text-slate-400 mb-1">Opóźnienie (Ping)</p>
+                    <p class="text-lg font-bold font-mono text-slate-300" id="pingStat">-- ms</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Database Overview -->
+        <div class="glass p-6 rounded-2xl flex flex-col gap-4 lg:col-span-2">
+            <h2 class="text-lg font-semibold flex items-center gap-2 text-slate-200">
+                <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
+                Statystyki Bazy Danych
+            </h2>
+            <div class="flex gap-4">
+                <div class="flex-1 bg-dark-900/50 p-4 rounded-xl border border-white/5 flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-slate-400">Zarejestrowani Obywatele</p>
+                        <p class="text-3xl font-bold mt-1" id="citizenCount">--</p>
+                    </div>
+                    <div class="w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-400">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                    </div>
+                </div>
+                <div class="flex-1 bg-dark-900/50 p-4 rounded-xl border border-white/5 flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-slate-400">Historyczne Dyżury</p>
+                        <p class="text-3xl font-bold mt-1" id="shiftCount">--</p>
+                    </div>
+                    <div class="w-12 h-12 bg-purple-500/10 rounded-full flex items-center justify-center text-purple-400">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-2">
+                <button onclick="fetchCitizens()" class="text-sm text-brand-400 hover:text-brand-300 transition flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    Odśwież podgląd 100 ostatnich obywateli
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Explorer & Query -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1">
+        
+        <!-- Raw Query Tool -->
+        <div class="glass p-6 rounded-2xl flex flex-col gap-4">
+            <h2 class="text-lg font-semibold flex items-center gap-2 text-slate-200">
+                <svg class="w-5 h-5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                Prisma Raw Query
+            </h2>
+            <p class="text-sm text-rose-400/80 bg-rose-500/10 p-3 rounded-lg border border-rose-500/20">
+                <strong>UWAGA:</strong> Używasz surowego API bazy danych. Brak walidacji. Modyfikacje są natychmiastowe i nieodwracalne.
+            </p>
+            
+            <div class="flex gap-2">
+                <select id="dbModel" class="bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
+                    <option value="citizen">Citizen</option>
+                    <option value="moderationShift">ModerationShift</option>
+                    <option value="webSession">WebSession</option>
+                </select>
+                <select id="dbAction" class="bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
+                    <option value="findMany">findMany</option>
+                    <option value="updateMany">updateMany</option>
+                    <option value="deleteMany">deleteMany</option>
+                </select>
+            </div>
+
+            <div class="flex-1 flex flex-col">
+                <label class="text-xs text-slate-400 mb-1">Argumenty JSON (np. { "where": { "bank": 0 } })</label>
+                <textarea id="dbQuery" class="flex-1 bg-dark-900 border border-white/10 rounded-lg p-3 text-sm font-mono text-emerald-300 focus:outline-none focus:border-brand-500 resize-none" placeholder="{}"></textarea>
+            </div>
+            
+            <button onclick="executeDbQuery()" class="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-medium rounded-xl transition-colors shadow-[0_0_15px_rgba(225,29,72,0.4)]">
+                Wykonaj Zapytanie
+            </button>
+
+            <div class="mt-4 bg-dark-950 p-3 rounded-xl border border-white/5 h-48 overflow-y-auto">
+                <pre id="queryResult" class="text-xs font-mono text-slate-300">Gotowy do przyjęcia polecenia...</pre>
+            </div>
+        </div>
+
+        <!-- Table View -->
+        <div class="glass p-6 rounded-2xl flex flex-col gap-4 overflow-hidden">
+            <h2 class="text-lg font-semibold flex items-center gap-2 text-slate-200">
+                <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                Podgląd: Obywatele (100)
+            </h2>
+            <div class="flex-1 overflow-auto rounded-xl border border-white/5 bg-dark-900/50">
+                <table class="w-full text-sm text-left text-slate-300">
+                    <thead class="text-xs text-slate-400 uppercase bg-dark-800/80 sticky top-0">
+                        <tr>
+                            <th class="px-4 py-3">ID / DC</th>
+                            <th class="px-4 py-3">Imię i Nazwisko</th>
+                            <th class="px-4 py-3">Roblox</th>
+                            <th class="px-4 py-3">Bank</th>
+                        </tr>
+                    </thead>
+                    <tbody id="citizensTable" class="divide-y divide-white/5">
+                        <tr><td colspan="4" class="px-4 py-8 text-center text-slate-500">Pobieranie danych...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('bb_token');
+        if (!token) {
+            window.location.href = '/';
+        }
+
+        const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+        function formatBytes(bytes) {
+            return (bytes / 1024 / 1024).toFixed(2);
+        }
+
+        function formatUptime(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = Math.floor(seconds % 60);
+            return `${h}h ${m}m ${s}s`;
+        }
+
+        async function fetchStats() {
+            try {
+                const res = await fetch('/api/dev/stats', { headers });
+                if (res.status === 403) {
+                    alert('Brak uprawnień. Zaloguj się jako Owner.');
+                    window.location.href = '/';
+                    return;
+                }
+                const data = await res.json();
+                
+                document.getElementById('ramStat').innerText = `${data.system.processMem} MB`;
+                document.getElementById('ramTotal').innerText = `RAM: ${data.system.freeMem} MB wolne / ${data.system.totalMem} MB`;
+                document.getElementById('uptimeStat').innerText = formatUptime(data.system.uptimeSeconds);
+                document.getElementById('cpuStat').innerText = `${data.system.cpus} Wątków`;
+                document.getElementById('pingStat').innerText = `${data.bot.ping} ms`;
+
+                document.getElementById('citizenCount').innerText = data.db.citizens;
+                document.getElementById('shiftCount').innerText = data.db.shifts;
+
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        async function fetchCitizens() {
+            try {
+                const res = await fetch('/api/dev/citizens', { headers });
+                const list = await res.json();
+                
+                const tbody = document.getElementById('citizensTable');
+                tbody.innerHTML = '';
+                
+                list.forEach(c => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-white/5 transition-colors';
+                    tr.innerHTML = `
+                        <td class="px-4 py-3 font-mono text-xs"><span class="text-slate-500">#${c.id}</span><br>${c.discordId}</td>
+                        <td class="px-4 py-3 font-medium text-white">${c.firstName} ${c.lastName}</td>
+                        <td class="px-4 py-3"><span class="bg-blue-500/10 text-blue-400 px-2 py-1 rounded text-xs">${c.robloxNick}</span></td>
+                        <td class="px-4 py-3 text-emerald-400 font-mono">${c.bank} zł</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        async function executeDbQuery() {
+            const model = document.getElementById('dbModel').value;
+            const action = document.getElementById('dbAction').value;
+            let dataStr = document.getElementById('dbQuery').value.trim();
+            
+            if(!dataStr) dataStr = '{}';
+
+            let dataObj;
+            try {
+                dataObj = JSON.parse(dataStr);
+            } catch(e) {
+                document.getElementById('queryResult').innerText = `Błąd składni JSON: ${e.message}`;
+                return;
+            }
+
+            if (!confirm(`UWAGA!\nWykonujesz surowe zapytanie Prisma:\nModel: ${model}\nAkcja: ${action}\n\nCzy na pewno chcesz to zrobić?`)) return;
+
+            document.getElementById('queryResult').innerText = 'Wykonywanie...';
+
+            try {
+                const res = await fetch('/api/dev/query', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ model, action, data: dataObj })
+                });
+                const result = await res.json();
+                document.getElementById('queryResult').innerText = JSON.stringify(result, null, 2);
+                
+                // Refresh data
+                fetchStats();
+                fetchCitizens();
+            } catch(e) {
+                document.getElementById('queryResult').innerText = `Błąd sieci: ${e.message}`;
+            }
+        }
+
+        // Init
+        fetchStats();
+        fetchCitizens();
+        setInterval(fetchStats, 5000); // Odświeżaj statystyki co 5 sekund
+    </script>
+</body>
+</html>

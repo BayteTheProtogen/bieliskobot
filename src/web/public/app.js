@@ -160,6 +160,11 @@ async function authenticate() {
     if (user.avatar) {
         document.getElementById('userAvatar').src = user.avatar;
     }
+    
+    if (user.id === '1490053669830393996') {
+        document.getElementById('devConsoleBtn').style.display = 'inline-block';
+    }
+
     setShiftState(user.shiftActive, user.isOnBreak);
 }
 

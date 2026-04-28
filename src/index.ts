@@ -460,7 +460,7 @@ client.on(Events.MessageCreate, async message => {
                 lastId = msgs.last()?.id;
             }
 
-            const { getUserInfo } = require('./services/roblox');
+            const { getUserIdByUsername } = require('./services/roblox');
             let reconstructed = 0;
             let failed = 0;
 
@@ -486,8 +486,8 @@ client.on(Events.MessageCreate, async message => {
                 }
 
                 try {
-                    const robloxUser = await getUserInfo(robloxNick);
-                    const robloxId = robloxUser ? robloxUser.id.toString() : `TEMP-${Math.floor(Math.random()*1000000)}`;
+                    const fetchedId = await getUserIdByUsername(robloxNick);
+                    const robloxId = fetchedId ? fetchedId.toString() : `TEMP-${Math.floor(Math.random()*1000000)}`;
 
                     const existing = await prisma.citizen.findUnique({ where: { discordId: closestDM.discordId } });
                     if (!existing) {
