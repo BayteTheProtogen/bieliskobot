@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 # Copy dependency definitions and install
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 # Copy all source files
 COPY . .
