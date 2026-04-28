@@ -161,7 +161,7 @@ async function authenticate() {
         document.getElementById('userAvatar').src = user.avatar;
     }
     
-    if (user.id === '1490053669830393996') {
+    if (user.isOwner) {
         document.getElementById('devConsoleBtn').style.display = 'inline-block';
     }
 

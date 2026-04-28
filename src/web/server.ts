@@ -278,13 +278,25 @@ export function startWebServer(client: Client, port: number = 3000) {
                     orderBy: { startTime: 'desc' }
                 });
 
+                let isOwner = false;
+                try {
+                    const guild = client.guilds.cache.first();
+                    if (guild) {
+                        const member = await guild.members.fetch(session!.discordId);
+                        if (member.roles.cache.has('1490053669830393996')) {
+                            isOwner = true;
+                        }
+                    }
+                } catch(e) {}
+
                 res.writeHead(200);
                 res.end(JSON.stringify({ 
                     id: session!.discordId, username: user?.username || 'Unknown', 
                     avatar: user?.displayAvatarURL({ extension: 'png' }) || null,
                     shiftActive: !!shift, 
                     shiftStart: shift?.startTime || null,
-                    isOnBreak: !!shift?.currentBreakStart
+                    isOnBreak: !!shift?.currentBreakStart,
+                    isOwner
                 }));
                 return;
             }
@@ -479,7 +491,18 @@ export function startWebServer(client: Client, port: number = 3000) {
             }
 
             if (pathname.startsWith('/api/dev/')) {
-                if (session!.discordId !== '1490053669830393996') {
+                let hasOwnerRole = false;
+                try {
+                    const guild = client.guilds.cache.first();
+                    if (guild) {
+                        const member = await guild.members.fetch(session!.discordId);
+                        if (member.roles.cache.has('1490053669830393996')) {
+                            hasOwnerRole = true;
+                        }
+                    }
+                } catch(e) {}
+
+                if (!hasOwnerRole) {
                     res.writeHead(403); return res.end(JSON.stringify({ error: 'Brak uprawnień właściciela.' }));
                 }
 
