@@ -58,6 +58,14 @@ export const rybyCommand = {
         await interaction.deferReply({ ephemeral: true });
 
         try {
+            const { saveImage, getImageUrl } = require('../services/storage');
+            const axios = require('axios');
+            
+            const response = await axios.get(screenshot.url, { responseType: 'arraybuffer' });
+            const fileBuffer = Buffer.from(response.data);
+            const filename = await saveImage(fileBuffer, 'fish');
+            const localUrl = getImageUrl(filename, 'fish');
+
             // 5. Utworzenie wniosku w bazie
             await (prisma as any).fishingRequest.create({
                 data: {
@@ -65,7 +73,7 @@ export const rybyCommand = {
                     robloxNick: citizen.robloxNick,
                     amount: sumaBrutto,
                     taxedAmount,
-                    screenshotUrl: screenshot.url
+                    screenshotUrl: localUrl
                 }
             });
 

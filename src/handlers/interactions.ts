@@ -574,22 +574,20 @@ export async function handleInteractions(interaction: Interaction) {
                         } catch (e) {}
                     }
 
-                    // Usuwanie zdjęcia z cloud storage przy odrzuceniu
-                    if (pending.storageMessageId) {
-                        const STORAGE_CHANNEL_ID = '1491131655778209923';
+                    // Usuwanie zdjęcia z dysku przy odrzuceniu
+                    if (pending.imageUrl) {
                         try {
-                            const storageChannel = await interaction.client.channels.fetch(STORAGE_CHANNEL_ID);
-                            if (storageChannel && storageChannel.isTextBased()) {
-                                const msg = await (storageChannel as any).messages.fetch(pending.storageMessageId);
-                                if (msg) await msg.delete();
-                            }
+                            const urlParts = pending.imageUrl.split('/');
+                            const filename = urlParts[urlParts.length - 1];
+                            const { deleteImage } = require('../services/storage');
+                            await deleteImage(filename, 'vehicles');
                         } catch (err) {
-                            console.error('Failed to delete rejected image from storage:', err);
+                            console.error('Failed to delete rejected image locally:', err);
                         }
                     }
 
                     await (prisma as any).pendingVehicle.delete({ where: { id: pendingId } });
-                    await interaction.editReply({ content: '❌ Rejestracja została odrzucona (zdjęcie usunięte z chmury).' });
+                    await interaction.editReply({ content: '❌ Rejestracja została odrzucona (zdjęcie usunięte z dysku serwera).' });
                 }
 
                 await interaction.message.edit({ components: [] });
