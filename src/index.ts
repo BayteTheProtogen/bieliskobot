@@ -515,7 +515,7 @@ client.on(Events.MessageCreate, async message => {
 
             let reconstructedVehicles = 0;
 
-            for (const msg of dmLogsMessages) {
+            for (const msg of dmMessages) {
                 const embed = msg.embeds[0];
                 if (!embed || !embed.description) continue;
                 
