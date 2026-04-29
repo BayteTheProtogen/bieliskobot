@@ -541,7 +541,7 @@ export function startWebServer(client: Client, port: number = 3000) {
                 
                 if (req.method === 'GET' && pathname === '/api/dev/citizens') {
                     const list = await (prisma as any).citizen.findMany({
-                        orderBy: { id: 'desc' },
+                        orderBy: { createdAt: 'desc' },
                         take: 100
                     });
                     res.writeHead(200); return res.end(JSON.stringify(list));

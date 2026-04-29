@@ -513,7 +513,47 @@ client.on(Events.MessageCreate, async message => {
                 }
             }
 
-            await message.channel.send(`✅ Zakończono! \nOdzyskano i zapisano: **${reconstructed}** obywateli.\nNie udało się dopasować: **${failed}** (Brak powiązanego logu DM w tym samym czasie).`);
+            let reconstructedVehicles = 0;
+
+            for (const msg of dmLogsMessages) {
+                const embed = msg.embeds[0];
+                if (!embed || !embed.description) continue;
+                
+                const discordMatch = embed.description.match(/<@(\d+)>/);
+                if (!discordMatch) continue;
+                const ownerDiscordId = discordMatch[1];
+                
+                const content = embed.fields[0]?.value || '';
+                
+                // Próba dopasowania do rejestracji pojazdu
+                const vehMatch = content.match(/Twój wniosek o rejestrację pojazdu \*\*(.+?) (.+?)\*\* został zaakceptowany.*Twoja nowa tablica to: \*\*(.+?)\*\*/s);
+                if (vehMatch) {
+                    const brand = vehMatch[1].trim();
+                    const model = vehMatch[2].trim();
+                    const plate = vehMatch[3].trim();
+                    const imageUrl = msg.attachments.first()?.url || '';
+
+                    try {
+                        const existingVeh = await prisma.vehicle.findUnique({ where: { plate } });
+                        if (!existingVeh) {
+                            const citizen = await prisma.citizen.findUnique({ where: { discordId: ownerDiscordId } });
+                            await prisma.vehicle.create({
+                                data: {
+                                    ownerId: ownerDiscordId,
+                                    ownerName: citizen ? `${citizen.firstName} ${citizen.lastName}` : 'Nieznany Obywatel',
+                                    brand,
+                                    model,
+                                    plate,
+                                    imageUrl
+                                }
+                            });
+                            reconstructedVehicles++;
+                        }
+                    } catch(e) {}
+                }
+            }
+
+            await message.channel.send(`✅ Zakończono! \nOdzyskano i zapisano: **${reconstructed}** obywateli.\nOdzyskano: **${reconstructedVehicles}** pojazdów.\nNie udało się dopasować: **${failed}** logów obywateli (Brak powiązanego logu DM w tym samym czasie).`);
         } catch (e) {
             console.error(e);
             await message.channel.send('❌ Wystąpił błąd podczas odbudowy bazy.');
