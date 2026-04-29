@@ -526,12 +526,16 @@ client.on(Events.MessageCreate, async message => {
                 const content = embed.fields[0]?.value || '';
                 
                 // Próba dopasowania do rejestracji pojazdu
-                const vehMatch = content.match(/Twój wniosek o rejestrację pojazdu \*\*(.+?) (.+?)\*\* został zaakceptowany.*Twoja nowa tablica to: \*\*(.+?)\*\*/s);
+                const vehMatch = content.match(/Twój wniosek o rejestrację pojazdu \*\*(.+?)\*\* został zaakceptowany.*Twoja nowa tablica to: \*\*(.+?)\*\*/s);
                 if (vehMatch) {
-                    const brand = vehMatch[1].trim();
-                    const model = vehMatch[2].trim();
-                    const plate = vehMatch[3].trim();
+                    const carName = vehMatch[1].trim();
+                    const plate = vehMatch[2].trim();
                     const imageUrl = msg.attachments.first()?.url || '';
+
+                    // Tymczasowy podział brand / model
+                    const parts = carName.split(' ');
+                    const brand = parts[0];
+                    const model = parts.slice(1).join(' ') || '-';
 
                     try {
                         const existingVeh = await prisma.vehicle.findUnique({ where: { plate } });
